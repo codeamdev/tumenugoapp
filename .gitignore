@@ -1,0 +1,18 @@
+node_modules/
+.expo/
+
+# Variables de entorno (secretos)
+.env.local
+.env.*.local
+.env.production
+
+# Expo generated
+expo-env.d.ts
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*

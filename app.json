@@ -1,0 +1,25 @@
+{
+  "expo": {
+    "name": "CafeteriaOS",
+    "slug": "cafeteria-mobile",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "assetBundlePatterns": ["**/*"],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.cafeteriaos.mobile"
+    },
+    "android": {
+      "package": "com.cafeteriaos.mobile"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store"
+    ],
+    "scheme": "cafeteriaos",
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}
