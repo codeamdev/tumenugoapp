@@ -304,7 +304,7 @@ function DetailModal({ order: orderProp, onClose, onRefresh, onRefreshDetail, re
     const next = status as OrderStatus
     setOrder((prev) => prev ? { ...prev, status: next } : prev)
     qc.setQueryData<Order[]>(['orders', 'active'], (old = []) =>
-      old.map((o) => o.id === order.id ? { ...o, status: next } : o)
+      old.map((o) => o.id === order!.id ? { ...o, status: next } : o)
     )
   }
 
@@ -317,14 +317,14 @@ function DetailModal({ order: orderProp, onClose, onRefresh, onRefreshDetail, re
     applyOptimisticStatus(status)
     setLoading(true)
     try {
-      await api.patch(`/api/tenant/orders/${order.id}`, { status })
+      await api.patch(`/api/tenant/orders/${order!.id}`, { status })
       onRefresh()
     } catch (err: any) {
       rollbackStatus()
       const isNetErr = !isConnected || err?.message?.includes('Network request failed')
       if (isNetErr) {
         applyOptimisticStatus(status) // re-apply: user sees queued state
-        enqueueSync('update_order_status', { orderId: order.id, status })
+        enqueueSync('update_order_status', { orderId: order!.id, status })
         Alert.alert('Sin conexión', 'El cambio se sincronizará cuando vuelva la conexión.')
         onClose()
       } else {
@@ -341,14 +341,14 @@ function DetailModal({ order: orderProp, onClose, onRefresh, onRefreshDetail, re
           applyOptimisticStatus('cancelled')
           setLoading(true)
           try {
-            await api.patch(`/api/tenant/orders/${order.id}`, { status: 'cancelled' })
+            await api.patch(`/api/tenant/orders/${order!.id}`, { status: 'cancelled' })
             onRefresh(); onClose()
           } catch (err: any) {
             rollbackStatus()
             const isNetErr = !isConnected || err?.message?.includes('Network request failed')
             if (isNetErr) {
               applyOptimisticStatus('cancelled')
-              enqueueSync('update_order_status', { orderId: order.id, status: 'cancelled' })
+              enqueueSync('update_order_status', { orderId: order!.id, status: 'cancelled' })
               Alert.alert('Sin conexión', 'La cancelación se sincronizará cuando vuelva la conexión.')
               onClose()
             } else {
@@ -377,7 +377,7 @@ function DetailModal({ order: orderProp, onClose, onRefresh, onRefreshDetail, re
             } : prev)
             setCancellingItem(itemId)
             try {
-              await api.delete(`/api/tenant/orders/${order.id}/items/${itemId}`)
+              await api.delete(`/api/tenant/orders/${order!.id}/items/${itemId}`)
               if (onRefreshDetail) await onRefreshDetail()
               onRefresh()
             } catch (err: any) {
@@ -385,7 +385,7 @@ function DetailModal({ order: orderProp, onClose, onRefresh, onRefreshDetail, re
               setOrder(orderProp)
               const isNetErr = !isConnected || err?.message?.includes('Network request failed')
               if (isNetErr) {
-                enqueueSync('cancel_item', { orderId: order.id, itemId })
+                enqueueSync('cancel_item', { orderId: order!.id, itemId })
                 Alert.alert('Sin conexión', 'La cancelación se sincronizará cuando vuelva la conexión.')
                 onClose()
               } else {

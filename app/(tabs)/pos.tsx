@@ -381,7 +381,12 @@ function CartModal({ visible, onClose, tables }: {
                   <TouchableOpacity
                     key={t.key}
                     style={[styles.chip, orderType === t.key && { backgroundColor: PRIMARY, borderColor: PRIMARY }]}
-                    onPress={() => setOrderType(t.key)}
+                    onPress={() => {
+                      setOrderType(t.key)
+                      if (t.key === 'delivery' && config?.defaultDeliveryFee && !deliveryFee) {
+                        setDeliveryFee(String(config.defaultDeliveryFee))
+                      }
+                    }}
                   >
                     <Text style={[styles.chipText, orderType === t.key && { color: '#fff' }]}>{t.label}</Text>
                   </TouchableOpacity>

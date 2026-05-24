@@ -28,10 +28,11 @@ interface CajaData {
 function OpenModal({ visible, sign, onClose, onDone }: {
   visible: boolean; sign: string; onClose: () => void; onDone: () => void
 }) {
-  const { tenant } = useAuthStore()
+  const { tenant, config } = useAuthStore()
   const { isConnected } = useNetworkStatus()
   const PRIMARY = tenant?.primaryColor ?? '#2563eb'
-  const [amount, setAmount] = useState('')
+  const defaultAmount = config?.defaultOpeningAmount ?? 0
+  const [amount, setAmount] = useState(defaultAmount > 0 ? String(defaultAmount) : '')
   const [notes, setNotes]   = useState('')
   const [loading, setLoading] = useState(false)
 

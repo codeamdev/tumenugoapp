@@ -25,6 +25,7 @@ export interface TenantConfig {
     fee: boolean
   }
   defaultOpeningAmount?: number
+  defaultDeliveryFee?: number
 }
 
 // Backend uses 'table' | 'bar' | 'delivery'

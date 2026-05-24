@@ -165,7 +165,7 @@ export default function ConfiguracionScreen() {
               <Text style={styles.switchLabel}>{label}</Text>
               <Switch
                 value={delivery[key]}
-                onValueChange={(v) => isConnected && setDelivery((prev) => ({ ...prev, [key]: v }))}
+                onValueChange={(v) => { if (isConnected) setDelivery((prev) => ({ ...prev, [key]: v })) }}
                 disabled={!isConnected}
                 trackColor={{ false: '#e5e7eb', true: PRIMARY + '88' }}
                 thumbColor={delivery[key] ? PRIMARY : '#9ca3af'}
