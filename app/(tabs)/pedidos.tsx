@@ -81,15 +81,17 @@ function PayModal({ order, onClose, onRefresh }: {
   const orderTotal = parseFloat(order.total)
 
   const [payments, setPayments] = useState<PaymentRow[]>([{ method: methods[0]?.key ?? 'cash', amount: '' }])
-  const [tip, setTip]     = useState('')
-  const [notes, setNotes] = useState('')
-  const [loading, setLoading] = useState(false)
+  const [tip, setTip]           = useState('')
+  const [notes, setNotes]       = useState('')
+  const [customerName, setCustomerName] = useState(order.customerName ?? '')
+  const [loading, setLoading]   = useState(false)
 
   const tipNum      = parseFloat(tip) || 0
   const grandTotal  = orderTotal + tipNum
   const totalPaid   = payments.reduce((s, p) => s + (parseFloat(p.amount) || 0), 0)
   const remaining   = grandTotal - totalPaid
   const hasCash     = payments.some((p) => p.method === 'cash' && p.amount !== '')
+  const isCredit    = !!(methods.find((m) => m.key === payments[0]?.method)?.isCredit)
 
   function updateRow(idx: number, field: keyof PaymentRow, value: string) {
     setPayments((prev) => prev.map((p, i) => i === idx ? { ...p, [field]: value } : p))
@@ -123,6 +125,7 @@ function PayModal({ order, onClose, onRefresh }: {
         payments: validPayments,
         tipAmount: tipNum,
         paymentNotes: notes || undefined,
+        customerName: isCredit ? customerName.trim() : undefined,
       })
       onRefresh()
       onClose()
@@ -230,12 +233,26 @@ function PayModal({ order, onClose, onRefresh }: {
               />
             </View>
 
+            {/* Nombre del cliente — obligatorio para crédito */}
+            {isCredit && (
+              <View style={{ gap: 8 }}>
+                <Text style={styles.payLabel}>Nombre del cliente *</Text>
+                <TextInput
+                  style={styles.payInput}
+                  placeholder="Nombre completo de quien debe"
+                  value={customerName}
+                  onChangeText={setCustomerName}
+                  autoCapitalize="words"
+                />
+              </View>
+            )}
+
             {/* Notas */}
             <View style={{ gap: 8 }}>
-              <Text style={styles.payLabel}>Notas (opcional)</Text>
+              <Text style={styles.payLabel}>{isCredit ? 'Observaciones *' : 'Notas (opcional)'}</Text>
               <TextInput
                 style={[styles.payInput, { minHeight: 60, textAlignVertical: 'top' }]}
-                placeholder="Observaciones del pago..."
+                placeholder={isCredit ? 'Motivo, plazo de pago, referencia...' : 'Observaciones del pago...'}
                 value={notes}
                 onChangeText={setNotes}
                 multiline
@@ -243,12 +260,17 @@ function PayModal({ order, onClose, onRefresh }: {
             </View>
 
             <TouchableOpacity
-              style={[styles.confirmBtn, { backgroundColor: PRIMARY }, loading && styles.btnDisabled]}
-              onPress={confirm} disabled={loading}
+              style={[
+                styles.confirmBtn,
+                { backgroundColor: isCredit ? '#d97706' : PRIMARY },
+                (loading || (isCredit && (!customerName.trim() || !notes.trim()))) && styles.btnDisabled,
+              ]}
+              onPress={confirm}
+              disabled={loading || (isCredit && (!customerName.trim() || !notes.trim()))}
             >
               {loading
                 ? <ActivityIndicator color="#fff" />
-                : <Text style={styles.confirmBtnText}>Confirmar cobro</Text>}
+                : <Text style={styles.confirmBtnText}>{isCredit ? 'Registrar deuda' : 'Confirmar cobro'}</Text>}
             </TouchableOpacity>
           </ScrollView>
         </KeyboardAvoidingView>

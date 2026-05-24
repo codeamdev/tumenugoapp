@@ -17,7 +17,7 @@ export interface AuthTenant {
 }
 
 export interface TenantConfig {
-  paymentMethods: { key: string; label: string }[]
+  paymentMethods: { key: string; label: string; isCredit?: boolean }[]
   deliveryFields?: {
     phone: boolean
     address: boolean

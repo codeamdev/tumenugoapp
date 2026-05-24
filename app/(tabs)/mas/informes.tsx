@@ -18,13 +18,20 @@ const RANGES: { key: Range; label: string }[] = [
   { key: '30d',  label: '30 días' },
 ]
 
+function localDateStr(d: Date): string {
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+
 function getFromTo(range: Range): { from: string; to: string } {
   const now = new Date()
-  const to = now.toISOString().slice(0, 10)
+  const to = localDateStr(now)
   if (range === 'today') return { from: to, to }
   const d = new Date(now)
   d.setDate(d.getDate() - (range === '7d' ? 7 : 30))
-  return { from: d.toISOString().slice(0, 10), to }
+  return { from: localDateStr(d), to }
 }
 
 interface DayPoint  { date: string; sales: number }
