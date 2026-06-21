@@ -5,6 +5,7 @@ import { api } from '@/lib/api'
 import { useAuthStore } from '@/stores/auth-store'
 import { useNetworkStatus } from '@/hooks/use-network'
 import { enqueueSync } from '@/lib/offline/sync-queue'
+import { useAppColors } from '@/lib/theme'
 import type { Table } from '@/types'
 
 const STATUS_CONFIG = {
@@ -16,7 +17,7 @@ const STATUS_CONFIG = {
 
 type TableStatus = keyof typeof STATUS_CONFIG
 
-function TableCard({ table, onUpdate }: { table: Table; onUpdate: () => void }) {
+function TableCard({ table, onUpdate, c }: { table: Table; onUpdate: () => void; c: ReturnType<typeof import('@/lib/theme').useAppColors> }) {
   const cfg = STATUS_CONFIG[table.status as TableStatus] ?? STATUS_CONFIG.available
   const { isConnected } = useNetworkStatus()
   const qc = useQueryClient()
@@ -43,15 +44,17 @@ function TableCard({ table, onUpdate }: { table: Table; onUpdate: () => void }) 
     }
   }
 
+  const s = makeStyles(c)
+
   return (
-    <TouchableOpacity style={[styles.card, { borderLeftColor: cfg.color }]} onPress={cycle} activeOpacity={0.75}>
+    <TouchableOpacity style={[s.card, { borderLeftColor: cfg.color }]} onPress={cycle} activeOpacity={0.75}>
       <View style={{ flex: 1 }}>
-        <Text style={styles.tableName}>Mesa {table.name}</Text>
-        {table.zone ? <Text style={styles.tableSub}>{table.zone}</Text> : null}
-        {table.capacity ? <Text style={styles.tableSub}>{table.capacity} personas</Text> : null}
+        <Text style={s.tableName}>Mesa {table.name}</Text>
+        {table.zone ? <Text style={s.tableSub}>{table.zone}</Text> : null}
+        {table.capacity ? <Text style={s.tableSub}>{table.capacity} personas</Text> : null}
       </View>
-      <View style={[styles.badge, { backgroundColor: cfg.bg }]}>
-        <Text style={[styles.badgeText, { color: cfg.color }]}>{cfg.label}</Text>
+      <View style={[s.badge, { backgroundColor: cfg.bg }]}>
+        <Text style={[s.badgeText, { color: cfg.color }]}>{cfg.label}</Text>
       </View>
     </TouchableOpacity>
   )
@@ -61,6 +64,8 @@ export default function MesasScreen() {
   const qc = useQueryClient()
   const { tenant } = useAuthStore()
   const PRIMARY = tenant?.primaryColor ?? '#2563eb'
+  const c = useAppColors()
+  const s = makeStyles(c)
 
   const { data, isLoading, isRefetching, refetch } = useQuery({
     queryKey: ['tables'],
@@ -79,33 +84,33 @@ export default function MesasScreen() {
   const occupied  = tables.filter((t) => t.status === 'occupied').length
 
   if (isLoading) {
-    return <View style={styles.centered}><ActivityIndicator size="large" color={PRIMARY} /></View>
+    return <View style={s.centered}><ActivityIndicator size="large" color={PRIMARY} /></View>
   }
 
   return (
-    <View style={styles.root}>
+    <View style={s.root}>
       {/* Counters */}
-      <View style={styles.topBar}>
-        <View style={styles.counter}>
-          <View style={[styles.dot, { backgroundColor: '#10b981' }]} />
-          <Text style={styles.counterText}>Disponibles: <Text style={{ fontWeight: '700' }}>{available}</Text></Text>
+      <View style={s.topBar}>
+        <View style={s.counter}>
+          <View style={[s.dot, { backgroundColor: '#10b981' }]} />
+          <Text style={s.counterText}>Disponibles: <Text style={{ fontWeight: '700' }}>{available}</Text></Text>
         </View>
-        <View style={styles.counter}>
-          <View style={[styles.dot, { backgroundColor: '#f59e0b' }]} />
-          <Text style={styles.counterText}>Ocupadas: <Text style={{ fontWeight: '700' }}>{occupied}</Text></Text>
+        <View style={s.counter}>
+          <View style={[s.dot, { backgroundColor: '#f59e0b' }]} />
+          <Text style={s.counterText}>Ocupadas: <Text style={{ fontWeight: '700' }}>{occupied}</Text></Text>
         </View>
       </View>
 
       <FlatList
         data={tables}
         keyExtractor={(t) => t.id}
-        renderItem={({ item }) => <TableCard table={item} onUpdate={onUpdate} />}
-        contentContainerStyle={styles.list}
+        renderItem={({ item }) => <TableCard table={item} onUpdate={onUpdate} c={c} />}
+        contentContainerStyle={s.list}
         refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={PRIMARY} />}
         ListEmptyComponent={
-          <View style={styles.centered}>
-            <Ionicons name="grid-outline" size={48} color="#d1d5db" />
-            <Text style={styles.emptyText}>No hay mesas configuradas</Text>
+          <View style={s.centered}>
+            <Ionicons name="grid-outline" size={48} color={c.border} />
+            <Text style={s.emptyText}>No hay mesas configuradas</Text>
           </View>
         }
       />
@@ -113,28 +118,30 @@ export default function MesasScreen() {
   )
 }
 
-const styles = StyleSheet.create({
-  root:    { flex: 1, backgroundColor: '#f8fafc' },
-  centered:{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10, padding: 32 },
-  emptyText: { color: '#9ca3af', fontSize: 14 },
+function makeStyles(c: ReturnType<typeof import('@/lib/theme').useAppColors>) {
+  return StyleSheet.create({
+    root:    { flex: 1, backgroundColor: c.background },
+    centered:{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10, padding: 32 },
+    emptyText: { color: c.textMuted, fontSize: 14 },
 
-  topBar: {
-    flexDirection: 'row', gap: 20, paddingHorizontal: 16, paddingVertical: 12,
-    backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#f1f5f9',
-  },
-  counter:     { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  dot:         { width: 10, height: 10, borderRadius: 5 },
-  counterText: { fontSize: 13, color: '#374151' },
+    topBar: {
+      flexDirection: 'row', gap: 20, paddingHorizontal: 16, paddingVertical: 12,
+      backgroundColor: c.surface, borderBottomWidth: 1, borderBottomColor: c.surfaceAlt,
+    },
+    counter:     { flexDirection: 'row', alignItems: 'center', gap: 6 },
+    dot:         { width: 10, height: 10, borderRadius: 5 },
+    counterText: { fontSize: 13, color: c.textSecondary },
 
-  list: { padding: 12, gap: 10, paddingBottom: 32 },
-  card: {
-    flexDirection: 'row', alignItems: 'center',
-    backgroundColor: '#fff', borderRadius: 12, padding: 16,
-    borderLeftWidth: 4,
-    shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 6, elevation: 2,
-  },
-  tableName: { fontSize: 16, fontWeight: '700', color: '#1e293b' },
-  tableSub:  { fontSize: 12, color: '#94a3b8', marginTop: 2 },
-  badge:     { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 },
-  badgeText: { fontSize: 12, fontWeight: '600' },
-})
+    list: { padding: 12, gap: 10, paddingBottom: 32 },
+    card: {
+      flexDirection: 'row', alignItems: 'center',
+      backgroundColor: c.surface, borderRadius: 12, padding: 16,
+      borderLeftWidth: 4,
+      shadowColor: c.shadow, shadowOpacity: 0.04, shadowRadius: 6, elevation: 2,
+    },
+    tableName: { fontSize: 16, fontWeight: '700', color: c.text },
+    tableSub:  { fontSize: 12, color: c.textMuted, marginTop: 2 },
+    badge:     { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 },
+    badgeText: { fontSize: 12, fontWeight: '600' },
+  })
+}

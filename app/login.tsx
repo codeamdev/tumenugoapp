@@ -6,6 +6,7 @@ import {
 import { Ionicons } from '@expo/vector-icons'
 import { useAuthStore } from '@/stores/auth-store'
 import { ApiError } from '@/lib/api'
+import { useAppColors } from '@/lib/theme'
 
 // ─── Selector de tenant (cuando un usuario pertenece a varios tenants) ────────
 
@@ -20,13 +21,16 @@ function TenantPicker({
   onSelect: (slug: string) => void
   onCancel: () => void
 }) {
+  const c = useAppColors()
+  const p = makeTenantPickerStyles(c)
+
   return (
     <Modal visible animationType="slide" presentationStyle="formSheet">
       <View style={p.root}>
         <View style={p.header}>
           <Text style={p.title}>Selecciona tu negocio</Text>
           <TouchableOpacity onPress={onCancel}>
-            <Ionicons name="close" size={24} color="#374151" />
+            <Ionicons name="close" size={24} color={c.textSecondary} />
           </TouchableOpacity>
         </View>
         <Text style={p.subtitle}>Tu correo está asociado a más de un establecimiento.</Text>
@@ -43,7 +47,7 @@ function TenantPicker({
                 <Text style={p.cardName}>{item.name}</Text>
                 <Text style={p.cardSlug}>{item.slug}</Text>
               </View>
-              <Ionicons name="chevron-forward" size={18} color="#94a3b8" />
+              <Ionicons name="chevron-forward" size={18} color={c.textMuted} />
             </TouchableOpacity>
           )}
         />
@@ -52,21 +56,25 @@ function TenantPicker({
   )
 }
 
-const p = StyleSheet.create({
-  root:     { flex: 1, backgroundColor: '#f8fafc' },
-  header:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 20, borderBottomWidth: 1, borderBottomColor: '#f1f5f9' },
-  title:    { fontSize: 18, fontWeight: '700', color: '#0f172a' },
-  subtitle: { fontSize: 14, color: '#64748b', paddingHorizontal: 20, paddingTop: 12 },
-  card:     { flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', borderRadius: 12, padding: 14, gap: 12, shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 6, elevation: 2 },
-  cardIcon: { width: 42, height: 42, borderRadius: 10, backgroundColor: '#eff6ff', alignItems: 'center', justifyContent: 'center' },
-  cardName: { fontSize: 15, fontWeight: '600', color: '#1e293b' },
-  cardSlug: { fontSize: 12, color: '#94a3b8', marginTop: 2 },
-})
+function makeTenantPickerStyles(c: ReturnType<typeof useAppColors>) {
+  return StyleSheet.create({
+    root:     { flex: 1, backgroundColor: c.background },
+    header:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 20, borderBottomWidth: 1, borderBottomColor: c.border },
+    title:    { fontSize: 18, fontWeight: '700', color: c.text },
+    subtitle: { fontSize: 14, color: c.textMuted, paddingHorizontal: 20, paddingTop: 12 },
+    card:     { flexDirection: 'row', alignItems: 'center', backgroundColor: c.surface, borderRadius: 12, padding: 14, gap: 12, shadowColor: c.shadow, shadowOpacity: 0.04, shadowRadius: 6, elevation: 2 },
+    cardIcon: { width: 42, height: 42, borderRadius: 10, backgroundColor: '#eff6ff', alignItems: 'center', justifyContent: 'center' },
+    cardName: { fontSize: 15, fontWeight: '600', color: c.text },
+    cardSlug: { fontSize: 12, color: c.textMuted, marginTop: 2 },
+  })
+}
 
 // ─── Pantalla de login ────────────────────────────────────────────────────────
 
 export default function LoginScreen() {
   const { login } = useAuthStore()
+  const c = useAppColors()
+  const s = makeLoginStyles(c)
 
   const [email,    setEmail]    = useState('')
   const [password, setPassword] = useState('')
@@ -122,23 +130,24 @@ export default function LoginScreen() {
   return (
     <>
       <KeyboardAvoidingView
-        style={styles.root}
+        style={s.root}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
-        <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
-          <View style={styles.header}>
-            <View style={styles.logoBox}>
-              <Text style={styles.logoEmoji}>☕</Text>
+        <ScrollView contentContainerStyle={s.scroll} keyboardShouldPersistTaps="handled">
+          <View style={s.header}>
+            <View style={s.logoBox}>
+              <Text style={s.logoEmoji}>☕</Text>
             </View>
-            <Text style={styles.title}>Bienvenido</Text>
-            <Text style={styles.subtitle}>Inicia sesión para continuar</Text>
+            <Text style={s.title}>Bienvenido</Text>
+            <Text style={s.subtitle}>Inicia sesión para continuar</Text>
           </View>
 
-          <View style={styles.card}>
-            <Text style={styles.fieldLabel}>Correo electrónico</Text>
+          <View style={s.card}>
+            <Text style={s.fieldLabel}>Correo electrónico</Text>
             <TextInput
-              style={styles.input}
+              style={s.input}
               placeholder="tu@correo.com"
+              placeholderTextColor={c.textMuted}
               value={email}
               onChangeText={setEmail}
               autoCapitalize="none"
@@ -147,10 +156,11 @@ export default function LoginScreen() {
               autoComplete="email"
             />
 
-            <Text style={[styles.fieldLabel, { marginTop: 16 }]}>Contraseña</Text>
+            <Text style={[s.fieldLabel, { marginTop: 16 }]}>Contraseña</Text>
             <TextInput
-              style={styles.input}
+              style={s.input}
               placeholder="••••••••"
+              placeholderTextColor={c.textMuted}
               value={password}
               onChangeText={setPassword}
               secureTextEntry
@@ -159,14 +169,14 @@ export default function LoginScreen() {
             />
 
             <TouchableOpacity
-              style={[styles.btn, loading && styles.btnDisabled]}
+              style={[s.btn, loading && s.btnDisabled]}
               onPress={() => handleLogin()}
               disabled={loading}
               activeOpacity={0.8}
             >
               {loading
                 ? <ActivityIndicator color="#fff" />
-                : <Text style={styles.btnText}>Iniciar sesión</Text>
+                : <Text style={s.btnText}>Iniciar sesión</Text>
               }
             </TouchableOpacity>
           </View>
@@ -184,31 +194,33 @@ export default function LoginScreen() {
   )
 }
 
-const styles = StyleSheet.create({
-  root:   { flex: 1, backgroundColor: '#f1f5f9' },
-  scroll: { flexGrow: 1, justifyContent: 'center', padding: 24 },
+function makeLoginStyles(c: ReturnType<typeof useAppColors>) {
+  return StyleSheet.create({
+    root:   { flex: 1, backgroundColor: c.surfaceAlt },
+    scroll: { flexGrow: 1, justifyContent: 'center', padding: 24 },
 
-  header: { alignItems: 'center', marginBottom: 32 },
-  logoBox: {
-    width: 76, height: 76, borderRadius: 22,
-    backgroundColor: '#2563eb', alignItems: 'center', justifyContent: 'center',
-    marginBottom: 14,
-    shadowColor: '#2563eb', shadowOpacity: 0.35, shadowRadius: 12, elevation: 6,
-  },
-  logoEmoji: { fontSize: 38 },
-  title:    { fontSize: 26, fontWeight: '800', color: '#0f172a' },
-  subtitle: { fontSize: 14, color: '#64748b', marginTop: 4 },
+    header: { alignItems: 'center', marginBottom: 32 },
+    logoBox: {
+      width: 76, height: 76, borderRadius: 22,
+      backgroundColor: '#2563eb', alignItems: 'center', justifyContent: 'center',
+      marginBottom: 14,
+      shadowColor: '#2563eb', shadowOpacity: 0.35, shadowRadius: 12, elevation: 6,
+    },
+    logoEmoji: { fontSize: 38 },
+    title:    { fontSize: 26, fontWeight: '800', color: c.text },
+    subtitle: { fontSize: 14, color: c.textMuted, marginTop: 4 },
 
-  card: {
-    backgroundColor: '#fff', borderRadius: 16, padding: 24,
-    shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 16, elevation: 4,
-  },
-  fieldLabel: { fontSize: 13, fontWeight: '600', color: '#374151', marginBottom: 6 },
-  input: {
-    borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 10,
-    padding: 12, fontSize: 15, color: '#0f172a', backgroundColor: '#f8fafc',
-  },
-  btn:         { backgroundColor: '#2563eb', borderRadius: 10, padding: 15, alignItems: 'center', marginTop: 24 },
-  btnDisabled: { opacity: 0.6 },
-  btnText:     { color: '#fff', fontWeight: '700', fontSize: 16 },
-})
+    card: {
+      backgroundColor: c.surface, borderRadius: 16, padding: 24,
+      shadowColor: c.shadow, shadowOpacity: 0.06, shadowRadius: 16, elevation: 4,
+    },
+    fieldLabel: { fontSize: 13, fontWeight: '600', color: c.textSecondary, marginBottom: 6 },
+    input: {
+      borderWidth: 1, borderColor: c.border, borderRadius: 10,
+      padding: 12, fontSize: 15, color: c.text, backgroundColor: c.surfaceAlt,
+    },
+    btn:         { backgroundColor: '#2563eb', borderRadius: 10, padding: 15, alignItems: 'center', marginTop: 24 },
+    btnDisabled: { opacity: 0.6 },
+    btnText:     { color: '#fff', fontWeight: '700', fontSize: 16 },
+  })
+}

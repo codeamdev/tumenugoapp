@@ -6,16 +6,18 @@ import { Ionicons } from '@expo/vector-icons'
 import { api } from '@/lib/api'
 import { formatCurrency } from '@/lib/utils'
 import { useAuthStore } from '@/stores/auth-store'
+import { useAppColors } from '@/lib/theme'
 import type { Product, Category } from '@/types'
 
-function ProductRow({ product, categories, primary, sign, onToggle }: {
+function ProductRow({ product, categories, primary, sign, onToggle, c }: {
   product: Product
   categories: Category[]
   primary: string
   sign: string
   onToggle: () => void
+  c: ReturnType<typeof import('@/lib/theme').useAppColors>
 }) {
-  const cat = categories.find((c) => c.id === product.categoryId)
+  const cat = categories.find((cat) => cat.id === product.categoryId)
 
   async function toggle(value: boolean) {
     try {
@@ -26,16 +28,18 @@ function ProductRow({ product, categories, primary, sign, onToggle }: {
     }
   }
 
+  const s = makeStyles(c)
+
   return (
-    <View style={[styles.row, !product.isAvailable && styles.rowInactive]}>
-      <View style={styles.rowIcon}>
-        <Ionicons name="fast-food-outline" size={20} color={product.isAvailable ? primary : '#94a3b8'} />
+    <View style={[s.row, !product.isAvailable && s.rowInactive]}>
+      <View style={s.rowIcon}>
+        <Ionicons name="fast-food-outline" size={20} color={product.isAvailable ? primary : c.textMuted} />
       </View>
       <View style={{ flex: 1 }}>
-        <Text style={[styles.productName, !product.isAvailable && styles.textInactive]}>
+        <Text style={[s.productName, !product.isAvailable && s.textInactive]}>
           {product.name}
         </Text>
-        <Text style={styles.productSub}>
+        <Text style={s.productSub}>
           {cat ? `${cat.emoji ? cat.emoji + ' ' : ''}${cat.name}` : 'Sin categoría'}
           {'  ·  '}{formatCurrency(parseFloat(product.price), sign)}
         </Text>
@@ -43,8 +47,8 @@ function ProductRow({ product, categories, primary, sign, onToggle }: {
       <Switch
         value={product.isAvailable}
         onValueChange={toggle}
-        trackColor={{ false: '#e5e7eb', true: primary + '60' }}
-        thumbColor={product.isAvailable ? primary : '#9ca3af'}
+        trackColor={{ false: c.border, true: primary + '60' }}
+        thumbColor={product.isAvailable ? primary : c.textMuted}
       />
     </View>
   )
@@ -55,6 +59,8 @@ export default function ProductosScreen() {
   const qc = useQueryClient()
   const { tenant, user } = useAuthStore()
   const PRIMARY = tenant?.primaryColor ?? '#2563eb'
+  const c = useAppColors()
+  const s = makeStyles(c)
 
   useEffect(() => {
     if (user && !['admin', 'cajero'].includes(user.role)) router.back()
@@ -85,20 +91,20 @@ export default function ProductosScreen() {
   }
 
   if (isLoading) {
-    return <View style={styles.centered}><ActivityIndicator size="large" color={PRIMARY} /></View>
+    return <View style={s.centered}><ActivityIndicator size="large" color={PRIMARY} /></View>
   }
 
   return (
-    <View style={styles.root}>
+    <View style={s.root}>
       {/* Stats bar */}
-      <View style={styles.topBar}>
-        <View style={styles.counter}>
-          <View style={[styles.dot, { backgroundColor: PRIMARY }]} />
-          <Text style={styles.counterText}>Disponibles: <Text style={{ fontWeight: '700' }}>{available}</Text></Text>
+      <View style={s.topBar}>
+        <View style={s.counter}>
+          <View style={[s.dot, { backgroundColor: PRIMARY }]} />
+          <Text style={s.counterText}>Disponibles: <Text style={{ fontWeight: '700' }}>{available}</Text></Text>
         </View>
-        <View style={styles.counter}>
-          <View style={[styles.dot, { backgroundColor: '#94a3b8' }]} />
-          <Text style={styles.counterText}>Pausados: <Text style={{ fontWeight: '700' }}>{unavailable}</Text></Text>
+        <View style={s.counter}>
+          <View style={[s.dot, { backgroundColor: c.textMuted }]} />
+          <Text style={s.counterText}>Pausados: <Text style={{ fontWeight: '700' }}>{unavailable}</Text></Text>
         </View>
       </View>
 
@@ -106,14 +112,14 @@ export default function ProductosScreen() {
         data={products}
         keyExtractor={(p) => p.id}
         renderItem={({ item }) => (
-          <ProductRow product={item} categories={categories} primary={PRIMARY} sign={sign} onToggle={onToggle} />
+          <ProductRow product={item} categories={categories} primary={PRIMARY} sign={sign} onToggle={onToggle} c={c} />
         )}
-        contentContainerStyle={styles.list}
+        contentContainerStyle={s.list}
         refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={PRIMARY} />}
         ListEmptyComponent={
-          <View style={styles.centered}>
-            <Ionicons name="fast-food-outline" size={48} color="#d1d5db" />
-            <Text style={styles.emptyText}>Sin productos</Text>
+          <View style={s.centered}>
+            <Ionicons name="fast-food-outline" size={48} color={c.border} />
+            <Text style={s.emptyText}>Sin productos</Text>
           </View>
         }
       />
@@ -121,31 +127,33 @@ export default function ProductosScreen() {
   )
 }
 
-const styles = StyleSheet.create({
-  root:     { flex: 1, backgroundColor: '#f8fafc' },
-  centered: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10, padding: 32 },
-  emptyText:{ color: '#9ca3af', fontSize: 14 },
+function makeStyles(c: ReturnType<typeof import('@/lib/theme').useAppColors>) {
+  return StyleSheet.create({
+    root:     { flex: 1, backgroundColor: c.background },
+    centered: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10, padding: 32 },
+    emptyText:{ color: c.textMuted, fontSize: 14 },
 
-  topBar: {
-    flexDirection: 'row', gap: 20, paddingHorizontal: 16, paddingVertical: 12,
-    backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#f1f5f9',
-  },
-  counter:    { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  dot:        { width: 10, height: 10, borderRadius: 5 },
-  counterText:{ fontSize: 13, color: '#374151' },
+    topBar: {
+      flexDirection: 'row', gap: 20, paddingHorizontal: 16, paddingVertical: 12,
+      backgroundColor: c.surface, borderBottomWidth: 1, borderBottomColor: c.surfaceAlt,
+    },
+    counter:    { flexDirection: 'row', alignItems: 'center', gap: 6 },
+    dot:        { width: 10, height: 10, borderRadius: 5 },
+    counterText:{ fontSize: 13, color: c.textSecondary },
 
-  list: { paddingBottom: 32 },
-  row: {
-    flexDirection: 'row', alignItems: 'center', gap: 12,
-    backgroundColor: '#fff', paddingHorizontal: 16, paddingVertical: 14,
-    borderBottomWidth: 1, borderBottomColor: '#f8fafc',
-  },
-  rowInactive:  { backgroundColor: '#fafafa' },
-  rowIcon: {
-    width: 40, height: 40, borderRadius: 10,
-    backgroundColor: '#f1f5f9', alignItems: 'center', justifyContent: 'center',
-  },
-  productName:  { fontSize: 15, fontWeight: '600', color: '#1e293b' },
-  productSub:   { fontSize: 12, color: '#94a3b8', marginTop: 2 },
-  textInactive: { color: '#94a3b8' },
-})
+    list: { paddingBottom: 32 },
+    row: {
+      flexDirection: 'row', alignItems: 'center', gap: 12,
+      backgroundColor: c.surface, paddingHorizontal: 16, paddingVertical: 14,
+      borderBottomWidth: 1, borderBottomColor: c.background,
+    },
+    rowInactive:  { backgroundColor: c.surfaceAlt, opacity: 0.65 },
+    rowIcon: {
+      width: 40, height: 40, borderRadius: 10,
+      backgroundColor: c.surfaceAlt, alignItems: 'center', justifyContent: 'center',
+    },
+    productName:  { fontSize: 15, fontWeight: '600', color: c.text },
+    productSub:   { fontSize: 12, color: c.textMuted, marginTop: 2 },
+    textInactive: { color: c.textMuted },
+  })
+}

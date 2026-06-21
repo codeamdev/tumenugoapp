@@ -10,6 +10,7 @@ import { useAuthStore } from '@/stores/auth-store'
 import { enqueueSync } from '@/lib/offline/sync-queue'
 import { useNetworkStatus } from '@/hooks/use-network'
 import { ErrorView } from '@/components/ErrorView'
+import { useAppColors } from '@/lib/theme'
 import type { Order } from '@/types'
 
 // ─── Tarjeta de pedido ────────────────────────────────────────────────────────
@@ -18,6 +19,8 @@ function KitchenCard({ order, onUpdate }: { order: Order; onUpdate: () => void }
   const { tenant } = useAuthStore()
   const { isConnected } = useNetworkStatus()
   const qc = useQueryClient()
+  const c = useAppColors()
+  const styles = makeStyles(c)
   const PRIMARY = tenant?.primaryColor ?? '#2563eb'
   const isSent      = order.status === 'sent'
   const isPreparing = order.status === 'preparing'
@@ -117,6 +120,8 @@ function KitchenCard({ order, onUpdate }: { order: Order; onUpdate: () => void }
 export default function CocinaScreen() {
   const qc = useQueryClient()
   const { tenant } = useAuthStore()
+  const c = useAppColors()
+  const styles = makeStyles(c)
   const PRIMARY = tenant?.primaryColor ?? '#2563eb'
 
   const { data, isLoading, isError, isRefetching, refetch } = useQuery({
@@ -166,7 +171,7 @@ export default function CocinaScreen() {
         refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={PRIMARY} />}
         ListEmptyComponent={
           <View style={styles.centered}>
-            <Ionicons name="checkmark-done-circle-outline" size={60} color="#d1d5db" />
+            <Ionicons name="checkmark-done-circle-outline" size={60} color={c.borderStrong} />
             <Text style={styles.emptyTitle}>Cocina al día</Text>
             <Text style={styles.emptyText}>No hay pedidos pendientes</Text>
           </View>
@@ -178,52 +183,54 @@ export default function CocinaScreen() {
 
 // ─── Estilos ──────────────────────────────────────────────────────────────────
 
-const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#f8fafc' },
-  centered: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32, gap: 10 },
-  emptyTitle: { fontSize: 16, fontWeight: '700', color: '#374151' },
-  emptyText: { fontSize: 14, color: '#9ca3af' },
+function makeStyles(c: ReturnType<typeof useAppColors>) {
+  return StyleSheet.create({
+    root: { flex: 1, backgroundColor: c.background },
+    centered: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32, gap: 10 },
+    emptyTitle: { fontSize: 16, fontWeight: '700', color: c.textSecondary },
+    emptyText: { fontSize: 14, color: c.textMuted },
 
-  topBar: {
-    flexDirection: 'row', gap: 20, paddingHorizontal: 16, paddingVertical: 12,
-    backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#f1f5f9',
-  },
-  counter: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  counterText: { fontSize: 13, color: '#374151' },
+    topBar: {
+      flexDirection: 'row', gap: 20, paddingHorizontal: 16, paddingVertical: 12,
+      backgroundColor: c.surface, borderBottomWidth: 1, borderBottomColor: c.border,
+    },
+    counter: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+    counterText: { fontSize: 13, color: c.textSecondary },
 
-  list: { padding: 12, gap: 12, paddingBottom: 32 },
+    list: { padding: 12, gap: 12, paddingBottom: 32 },
 
-  card: {
-    backgroundColor: '#fff', borderRadius: 14, padding: 16,
-    shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 8, elevation: 3,
-    borderLeftWidth: 4, borderLeftColor: '#f59e0b',
-  },
-  cardUrgent: { borderLeftColor: '#ef4444' },
+    card: {
+      backgroundColor: c.surface, borderRadius: 14, padding: 16,
+      shadowColor: c.shadow, shadowOpacity: 0.06, shadowRadius: 8, elevation: 3,
+      borderLeftWidth: 4, borderLeftColor: '#f59e0b',
+    },
+    cardUrgent: { borderLeftColor: '#ef4444' },
 
-  cardTop: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 },
-  cardId:  { fontSize: 18, fontWeight: '800', color: '#0f172a' },
-  cardSub: { fontSize: 13, color: '#64748b', marginTop: 2 },
-  cardTime: { fontSize: 11, color: '#94a3b8', marginTop: 2 },
-  elapsed: { fontSize: 13, fontWeight: '600', color: '#64748b', marginTop: 2 },
-  elapsedUrgent: { color: '#ef4444' },
+    cardTop: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 },
+    cardId:  { fontSize: 18, fontWeight: '800', color: c.text },
+    cardSub: { fontSize: 13, color: c.textMuted, marginTop: 2 },
+    cardTime: { fontSize: 11, color: c.textMuted, marginTop: 2 },
+    elapsed: { fontSize: 13, fontWeight: '600', color: c.textMuted, marginTop: 2 },
+    elapsedUrgent: { color: '#ef4444' },
 
-  dot: { width: 10, height: 10, borderRadius: 5 },
-  dotSent:      { backgroundColor: '#f59e0b' },
-  dotPreparing: { backgroundColor: '#f97316' },
+    dot: { width: 10, height: 10, borderRadius: 5 },
+    dotSent:      { backgroundColor: '#f59e0b' },
+    dotPreparing: { backgroundColor: '#f97316' },
 
-  itemList: { gap: 8, marginBottom: 14 },
-  itemRow:  { flexDirection: 'row', gap: 8, alignItems: 'flex-start' },
-  itemQty:  { fontSize: 16, fontWeight: '800', minWidth: 30 },
-  itemName: { fontSize: 15, fontWeight: '600', color: '#1e293b' },
-  itemMods: { fontSize: 12, color: '#94a3b8', marginTop: 2 },
-  itemNotes: { fontSize: 12, color: '#f97316', marginTop: 2, fontWeight: '600' },
+    itemList: { gap: 8, marginBottom: 14 },
+    itemRow:  { flexDirection: 'row', gap: 8, alignItems: 'flex-start' },
+    itemQty:  { fontSize: 16, fontWeight: '800', minWidth: 30 },
+    itemName: { fontSize: 15, fontWeight: '600', color: c.text },
+    itemMods: { fontSize: 12, color: c.textMuted, marginTop: 2 },
+    itemNotes: { fontSize: 12, color: '#f97316', marginTop: 2, fontWeight: '600' },
 
-  cardActions: { flexDirection: 'row', gap: 10 },
-  actionBtn: {
-    flex: 1, flexDirection: 'row', alignItems: 'center',
-    justifyContent: 'center', borderRadius: 10, padding: 12, gap: 6,
-  },
-  btnPrepare: { backgroundColor: '#f97316' },
-  btnReady:   { backgroundColor: '#10b981' },
-  actionBtnText: { color: '#fff', fontWeight: '700', fontSize: 14 },
-})
+    cardActions: { flexDirection: 'row', gap: 10 },
+    actionBtn: {
+      flex: 1, flexDirection: 'row', alignItems: 'center',
+      justifyContent: 'center', borderRadius: 10, padding: 12, gap: 6,
+    },
+    btnPrepare: { backgroundColor: '#f97316' },
+    btnReady:   { backgroundColor: '#10b981' },
+    actionBtnText: { color: '#fff', fontWeight: '700', fontSize: 14 },
+  })
+}

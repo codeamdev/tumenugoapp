@@ -12,6 +12,7 @@ import { formatCurrency, formatDateTime } from '@/lib/utils'
 import { useAuthStore } from '@/stores/auth-store'
 import { useNetworkStatus } from '@/hooks/use-network'
 import { ErrorView } from '@/components/ErrorView'
+import { useAppColors } from '@/lib/theme'
 import type { CashRegister, CajaSummary } from '@/types'
 
 const GREEN = '#10b981'
@@ -31,6 +32,8 @@ function OpenModal({ visible, sign, onClose, onDone }: {
 }) {
   const { tenant, config } = useAuthStore()
   const { isConnected } = useNetworkStatus()
+  const c = useAppColors()
+  const styles = makeStyles(c)
   const PRIMARY = tenant?.primaryColor ?? '#2563eb'
   const defaultAmount = config?.defaultOpeningAmount ?? 0
   const [amount, setAmount] = useState(defaultAmount > 0 ? String(defaultAmount) : '')
@@ -62,7 +65,7 @@ function OpenModal({ visible, sign, onClose, onDone }: {
         <View style={styles.modalHeader}>
           <Text style={styles.modalTitle}>Abrir caja</Text>
           <TouchableOpacity onPress={onClose}>
-            <Ionicons name="close" size={24} color="#374151" />
+            <Ionicons name="close" size={24} color={c.textSecondary} />
           </TouchableOpacity>
         </View>
         <ScrollView contentContainerStyle={styles.modalBody}>
@@ -71,6 +74,7 @@ function OpenModal({ visible, sign, onClose, onDone }: {
             style={styles.input}
             keyboardType="numeric"
             placeholder="0"
+            placeholderTextColor={c.textMuted}
             value={amount}
             onChangeText={setAmount}
           />
@@ -78,6 +82,7 @@ function OpenModal({ visible, sign, onClose, onDone }: {
           <TextInput
             style={[styles.input, styles.inputMulti]}
             placeholder="Observaciones..."
+            placeholderTextColor={c.textMuted}
             value={notes}
             onChangeText={setNotes}
             multiline
@@ -102,6 +107,8 @@ function CloseModal({ visible, expected, sign, onClose, onDone }: {
   visible: boolean; expected: number; sign: string; onClose: () => void; onDone: () => void
 }) {
   const { isConnected } = useNetworkStatus()
+  const c = useAppColors()
+  const styles = makeStyles(c)
   const [counted, setCounted] = useState('')
   const [notes, setNotes]     = useState('')
   const [loading, setLoading] = useState(false)
@@ -133,7 +140,7 @@ function CloseModal({ visible, expected, sign, onClose, onDone }: {
         <View style={styles.modalHeader}>
           <Text style={styles.modalTitle}>Cerrar caja</Text>
           <TouchableOpacity onPress={onClose}>
-            <Ionicons name="close" size={24} color="#374151" />
+            <Ionicons name="close" size={24} color={c.textSecondary} />
           </TouchableOpacity>
         </View>
         <ScrollView contentContainerStyle={styles.modalBody}>
@@ -147,6 +154,7 @@ function CloseModal({ visible, expected, sign, onClose, onDone }: {
             style={styles.input}
             keyboardType="numeric"
             placeholder="0"
+            placeholderTextColor={c.textMuted}
             value={counted}
             onChangeText={setCounted}
           />
@@ -164,6 +172,7 @@ function CloseModal({ visible, expected, sign, onClose, onDone }: {
           <TextInput
             style={[styles.input, styles.inputMulti]}
             placeholder="Observaciones del arqueo..."
+            placeholderTextColor={c.textMuted}
             value={notes}
             onChangeText={setNotes}
             multiline
@@ -188,6 +197,8 @@ function CloseModal({ visible, expected, sign, onClose, onDone }: {
 function KpiCard({ label, value, icon, color }: {
   label: string; value: string; icon: string; color: string
 }) {
+  const c = useAppColors()
+  const styles = makeStyles(c)
   return (
     <View style={styles.kpi}>
       <View style={[styles.kpiIcon, { backgroundColor: color + '18' }]}>
@@ -202,6 +213,8 @@ function KpiCard({ label, value, icon, color }: {
 // ─── Fila historial ───────────────────────────────────────────────────────────
 
 function HistoryRow({ reg, sign }: { reg: CashRegister; sign: string }) {
+  const c = useAppColors()
+  const styles = makeStyles(c)
   const diff = parseFloat(reg.difference ?? '0')
   return (
     <View style={styles.histRow}>
@@ -229,6 +242,8 @@ export default function CajaScreen() {
   const router = useRouter()
   const qc = useQueryClient()
   const { tenant, user } = useAuthStore()
+  const c = useAppColors()
+  const styles = makeStyles(c)
   const PRIMARY = tenant?.primaryColor ?? '#2563eb'
 
   useEffect(() => {
@@ -284,7 +299,7 @@ export default function CajaScreen() {
               </Text>
             )}
           </View>
-          <View style={[styles.statusDot, { backgroundColor: isOpen ? GREEN : '#94a3b8' }]} />
+          <View style={[styles.statusDot, { backgroundColor: isOpen ? GREEN : c.textMuted }]} />
         </View>
 
         {/* ── KPIs (sólo si hay caja abierta con ventas) ── */}
@@ -336,7 +351,7 @@ export default function CajaScreen() {
 
         {history.length === 0 && !isOpen && (
           <View style={styles.emptyHistory}>
-            <Ionicons name="time-outline" size={40} color="#d1d5db" />
+            <Ionicons name="time-outline" size={40} color={c.borderStrong} />
             <Text style={styles.emptyText}>Sin historial de caja</Text>
           </View>
         )}
@@ -361,98 +376,100 @@ export default function CajaScreen() {
 
 // ─── Estilos ──────────────────────────────────────────────────────────────────
 
-const styles = StyleSheet.create({
-  root:    { flex: 1, backgroundColor: '#f8fafc' },
-  centered: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  scroll:  { padding: 16, gap: 14, paddingBottom: 40 },
+function makeStyles(c: ReturnType<typeof useAppColors>) {
+  return StyleSheet.create({
+    root:    { flex: 1, backgroundColor: c.background },
+    centered: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+    scroll:  { padding: 16, gap: 14, paddingBottom: 40 },
 
-  statusCard: {
-    flexDirection: 'row', alignItems: 'center', padding: 18,
-    borderRadius: 14, gap: 12,
-  },
-  statusOpen:   { backgroundColor: '#ecfdf5' },
-  statusClosed: { backgroundColor: '#f1f5f9' },
-  statusDot: { width: 14, height: 14, borderRadius: 7 },
-  statusTitle: { fontSize: 16, fontWeight: '700', color: '#1e293b' },
-  statusSub:   { fontSize: 13, color: '#64748b', marginTop: 2 },
+    statusCard: {
+      flexDirection: 'row', alignItems: 'center', padding: 18,
+      borderRadius: 14, gap: 12,
+    },
+    statusOpen:   { backgroundColor: c.successLight },
+    statusClosed: { backgroundColor: c.surfaceAlt },
+    statusDot: { width: 14, height: 14, borderRadius: 7 },
+    statusTitle: { fontSize: 16, fontWeight: '700', color: c.text },
+    statusSub:   { fontSize: 13, color: c.textMuted, marginTop: 2 },
 
-  kpiGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  kpi: {
-    flex: 1, minWidth: '45%', backgroundColor: '#fff', borderRadius: 12,
-    padding: 14, alignItems: 'flex-start', gap: 6,
-    shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 6, elevation: 2,
-  },
-  kpiIcon:  { borderRadius: 8, padding: 6 },
-  kpiValue: { fontSize: 18, fontWeight: '800', color: '#0f172a' },
-  kpiLabel: { fontSize: 12, color: '#94a3b8', fontWeight: '500' },
+    kpiGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+    kpi: {
+      flex: 1, minWidth: '45%', backgroundColor: c.surface, borderRadius: 12,
+      padding: 14, alignItems: 'flex-start', gap: 6,
+      shadowColor: c.shadow, shadowOpacity: 0.04, shadowRadius: 6, elevation: 2,
+    },
+    kpiIcon:  { borderRadius: 8, padding: 6 },
+    kpiValue: { fontSize: 18, fontWeight: '800', color: c.text },
+    kpiLabel: { fontSize: 12, color: c.textMuted, fontWeight: '500' },
 
-  section: {
-    backgroundColor: '#fff', borderRadius: 14, padding: 16, gap: 10,
-    shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 6, elevation: 2,
-  },
-  sectionTitle: { fontSize: 11, fontWeight: '700', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: 0.5 },
+    section: {
+      backgroundColor: c.surface, borderRadius: 14, padding: 16, gap: 10,
+      shadowColor: c.shadow, shadowOpacity: 0.04, shadowRadius: 6, elevation: 2,
+    },
+    sectionTitle: { fontSize: 11, fontWeight: '700', color: c.textMuted, textTransform: 'uppercase', letterSpacing: 0.5 },
 
-  methodRow:   { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 4 },
-  methodLabel: { fontSize: 14, color: '#374151' },
-  methodValue: { fontSize: 14, fontWeight: '700', color: '#0f172a' },
+    methodRow:   { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 4 },
+    methodLabel: { fontSize: 14, color: c.textSecondary },
+    methodValue: { fontSize: 14, fontWeight: '700', color: c.text },
 
-  openSubmitBtn: {
-    borderRadius: 12, padding: 15, alignItems: 'center',
-  },
-  openCajaBtn: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    borderRadius: 14, padding: 16, gap: 8,
-  },
-  closeCajaBtn: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    backgroundColor: '#ef4444', borderRadius: 14, padding: 16, gap: 8,
-  },
-  primaryBtnText: { color: '#fff', fontWeight: '700', fontSize: 15 },
+    openSubmitBtn: {
+      borderRadius: 12, padding: 15, alignItems: 'center',
+    },
+    openCajaBtn: {
+      flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+      borderRadius: 14, padding: 16, gap: 8,
+    },
+    closeCajaBtn: {
+      flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+      backgroundColor: '#ef4444', borderRadius: 14, padding: 16, gap: 8,
+    },
+    primaryBtnText: { color: '#fff', fontWeight: '700', fontSize: 15 },
 
-  histRow: {
-    flexDirection: 'row', alignItems: 'center', paddingVertical: 8,
-    borderTopWidth: 1, borderTopColor: '#f1f5f9',
-  },
-  histDate:     { fontSize: 13, fontWeight: '600', color: '#1e293b' },
-  histSub:      { fontSize: 12, color: '#94a3b8', marginTop: 2 },
-  histExpected: { fontSize: 14, fontWeight: '700', color: '#0f172a' },
-  histDiff:     { fontSize: 12, fontWeight: '600', marginTop: 2 },
-  diffPosText:  { color: GREEN },
-  diffNegText:  { color: '#ef4444' },
+    histRow: {
+      flexDirection: 'row', alignItems: 'center', paddingVertical: 8,
+      borderTopWidth: 1, borderTopColor: c.border,
+    },
+    histDate:     { fontSize: 13, fontWeight: '600', color: c.text },
+    histSub:      { fontSize: 12, color: c.textMuted, marginTop: 2 },
+    histExpected: { fontSize: 14, fontWeight: '700', color: c.text },
+    histDiff:     { fontSize: 12, fontWeight: '600', marginTop: 2 },
+    diffPosText:  { color: GREEN },
+    diffNegText:  { color: '#ef4444' },
 
-  emptyHistory: { alignItems: 'center', justifyContent: 'center', paddingVertical: 32, gap: 10 },
-  emptyText:    { fontSize: 14, color: '#9ca3af' },
+    emptyHistory: { alignItems: 'center', justifyContent: 'center', paddingVertical: 32, gap: 10 },
+    emptyText:    { fontSize: 14, color: c.textMuted },
 
-  // Modal
-  modalRoot:   { flex: 1, backgroundColor: '#fff' },
-  modalHeader: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 20, paddingVertical: 16,
-    borderBottomWidth: 1, borderBottomColor: '#f1f5f9',
-  },
-  modalTitle: { fontSize: 18, fontWeight: '700', color: '#0f172a' },
-  modalBody:  { padding: 20, gap: 12 },
+    // Modal
+    modalRoot:   { flex: 1, backgroundColor: c.surface },
+    modalHeader: {
+      flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+      paddingHorizontal: 20, paddingVertical: 16,
+      borderBottomWidth: 1, borderBottomColor: c.border,
+    },
+    modalTitle: { fontSize: 18, fontWeight: '700', color: c.text },
+    modalBody:  { padding: 20, gap: 12 },
 
-  label: { fontSize: 13, fontWeight: '600', color: '#374151' },
-  input: {
-    borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 10,
-    padding: 12, fontSize: 16, backgroundColor: '#f8fafc', color: '#0f172a',
-  },
-  inputMulti: { minHeight: 80, textAlignVertical: 'top' },
+    label: { fontSize: 13, fontWeight: '600', color: c.textSecondary },
+    input: {
+      borderWidth: 1, borderColor: c.border, borderRadius: 10,
+      padding: 12, fontSize: 16, backgroundColor: c.surfaceAlt, color: c.text,
+    },
+    inputMulti: { minHeight: 80, textAlignVertical: 'top' },
 
-  infoRow:   { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 },
-  infoLabel: { fontSize: 14, color: '#64748b' },
-  infoValue: { fontSize: 16, fontWeight: '700', color: '#0f172a' },
+    infoRow:   { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 },
+    infoLabel: { fontSize: 14, color: c.textMuted },
+    infoValue: { fontSize: 16, fontWeight: '700', color: c.text },
 
-  diffBox:  { borderRadius: 10, padding: 12, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  diffPos:  { backgroundColor: '#ecfdf5' },
-  diffNeg:  { backgroundColor: '#fef2f2' },
-  diffLabel:{ fontSize: 13, fontWeight: '600', color: '#374151' },
-  diffValue:{ fontSize: 16, fontWeight: '800', color: '#0f172a' },
+    diffBox:  { borderRadius: 10, padding: 12, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+    diffPos:  { backgroundColor: c.successLight },
+    diffNeg:  { backgroundColor: c.dangerLight },
+    diffLabel:{ fontSize: 13, fontWeight: '600', color: c.textSecondary },
+    diffValue:{ fontSize: 16, fontWeight: '800', color: c.text },
 
-  closeRegBtn: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    backgroundColor: '#ef4444', borderRadius: 12, padding: 14, gap: 8, marginTop: 8,
-  },
-  btnDisabled: { opacity: 0.5 },
-})
+    closeRegBtn: {
+      flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+      backgroundColor: '#ef4444', borderRadius: 12, padding: 14, gap: 8, marginTop: 8,
+    },
+    btnDisabled: { opacity: 0.5 },
+  })
+}

@@ -10,6 +10,7 @@ import { Ionicons } from '@expo/vector-icons'
 import { api } from '@/lib/api'
 import { useAuthStore } from '@/stores/auth-store'
 import { useNetworkStatus } from '@/hooks/use-network'
+import { useAppColors } from '@/lib/theme'
 import type { UserRole } from '@/types'
 
 const ROLE_LABELS: Record<UserRole, string> = {
@@ -35,18 +36,20 @@ interface User {
 
 // ─── Fila usuario ─────────────────────────────────────────────────────────────
 
-function UserRow({ user, currentUserId, onEdit, onDelete, onUpdate, isConnected }: {
+function UserRow({ user, currentUserId, onEdit, onDelete, onUpdate, isConnected, c }: {
   user: User
   currentUserId: string
   onEdit: (u: User) => void
   onDelete: (u: User) => void
   onUpdate: () => void
   isConnected: boolean
+  c: ReturnType<typeof import('@/lib/theme').useAppColors>
 }) {
   const { tenant } = useAuthStore()
   const PRIMARY = tenant?.primaryColor ?? '#2563eb'
   const roleColor = ROLE_COLORS[user.role] ?? '#6b7280'
   const isSelf = user.id === currentUserId
+  const s = makeStyles(c)
 
   async function toggleActive(val: boolean) {
     if (!isConnected) {
@@ -77,19 +80,19 @@ function UserRow({ user, currentUserId, onEdit, onDelete, onUpdate, isConnected 
       </View>
       <View style={s.rowActions}>
         <TouchableOpacity style={s.iconBtn} onPress={() => onEdit(user)}>
-          <Ionicons name="pencil-outline" size={16} color="#64748b" />
+          <Ionicons name="pencil-outline" size={16} color={c.textMuted} />
         </TouchableOpacity>
         {!isSelf && (
           <TouchableOpacity style={[s.iconBtn, s.iconBtnRed]} onPress={() => onDelete(user)}>
-            <Ionicons name="trash-outline" size={15} color="#ef4444" />
+            <Ionicons name="trash-outline" size={15} color={c.danger} />
           </TouchableOpacity>
         )}
         <Switch
           value={user.isActive}
           onValueChange={toggleActive}
           disabled={isSelf}
-          trackColor={{ false: '#e5e7eb', true: PRIMARY + '60' }}
-          thumbColor={user.isActive ? PRIMARY : '#9ca3af'}
+          trackColor={{ false: c.border, true: PRIMARY + '60' }}
+          thumbColor={user.isActive ? PRIMARY : c.textMuted}
         />
       </View>
     </View>
@@ -105,15 +108,17 @@ interface UserForm {
   role: UserRole
 }
 
-function UserModal({ visible, editing, onClose, onDone, isConnected }: {
+function UserModal({ visible, editing, onClose, onDone, isConnected, c }: {
   visible: boolean
   editing: User | null
   onClose: () => void
   onDone: () => void
   isConnected: boolean
+  c: ReturnType<typeof import('@/lib/theme').useAppColors>
 }) {
   const { tenant } = useAuthStore()
   const PRIMARY = tenant?.primaryColor ?? '#2563eb'
+  const s = makeStyles(c)
 
   const [form, setForm] = useState<UserForm>({ name: '', email: '', password: '', role: 'mesero' })
   const [loading, setLoading] = useState(false)
@@ -168,7 +173,7 @@ function UserModal({ visible, editing, onClose, onDone, isConnected }: {
         <View style={s.modalHeader}>
           <Text style={s.modalTitle}>{isEdit ? 'Editar usuario' : 'Nuevo usuario'}</Text>
           <TouchableOpacity onPress={onClose}>
-            <Ionicons name="close" size={24} color="#374151" />
+            <Ionicons name="close" size={24} color={c.textSecondary} />
           </TouchableOpacity>
         </View>
         <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
@@ -179,6 +184,7 @@ function UserModal({ visible, editing, onClose, onDone, isConnected }: {
               value={form.name}
               onChangeText={(v) => setForm((f) => ({ ...f, name: v }))}
               placeholder="María García"
+              placeholderTextColor={c.textMuted}
             />
 
             <Text style={s.label}>Correo electrónico *</Text>
@@ -187,6 +193,7 @@ function UserModal({ visible, editing, onClose, onDone, isConnected }: {
               value={form.email}
               onChangeText={(v) => setForm((f) => ({ ...f, email: v }))}
               placeholder="maria@cafeteria.com"
+              placeholderTextColor={c.textMuted}
               keyboardType="email-address"
               autoCapitalize="none"
             />
@@ -199,6 +206,7 @@ function UserModal({ visible, editing, onClose, onDone, isConnected }: {
               value={form.password}
               onChangeText={(v) => setForm((f) => ({ ...f, password: v }))}
               placeholder={isEdit ? '••••••••' : 'Mínimo 6 caracteres'}
+              placeholderTextColor={c.textMuted}
               secureTextEntry
             />
 
@@ -213,7 +221,7 @@ function UserModal({ visible, editing, onClose, onDone, isConnected }: {
                     style={[s.roleChip, active && { backgroundColor: color, borderColor: color }]}
                     onPress={() => setForm((f) => ({ ...f, role: r }))}
                   >
-                    <Text style={[s.roleChipText, active && { color: '#fff' }]}>{ROLE_LABELS[r]}</Text>
+                    <Text style={[s.roleChipText, active && { color: c.textInverse }]}>{ROLE_LABELS[r]}</Text>
                   </TouchableOpacity>
                 )
               })}
@@ -247,6 +255,8 @@ export default function UsuariosScreen() {
   const qc = useQueryClient()
   const { user: currentUser, tenant } = useAuthStore()
   const PRIMARY = tenant?.primaryColor ?? '#2563eb'
+  const c = useAppColors()
+  const s = makeStyles(c)
 
   useEffect(() => {
     if (currentUser && currentUser.role !== 'admin') router.back()
@@ -323,7 +333,7 @@ export default function UsuariosScreen() {
           </Text>
         </View>
         <View style={s.counter}>
-          <View style={[s.dot, { backgroundColor: '#94a3b8' }]} />
+          <View style={[s.dot, { backgroundColor: c.textMuted }]} />
           <Text style={s.counterText}>
             Total: <Text style={{ fontWeight: '700' }}>{users.length}</Text>
           </Text>
@@ -341,13 +351,14 @@ export default function UsuariosScreen() {
             onDelete={confirmDelete}
             onUpdate={onUpdate}
             isConnected={isConnected}
+            c={c}
           />
         )}
         contentContainerStyle={s.list}
         refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={PRIMARY} />}
         ListEmptyComponent={
           <View style={s.centered}>
-            <Ionicons name="people-outline" size={48} color="#d1d5db" />
+            <Ionicons name="people-outline" size={48} color={c.border} />
             <Text style={s.emptyText}>Sin usuarios</Text>
           </View>
         }
@@ -356,7 +367,7 @@ export default function UsuariosScreen() {
 
       {/* FAB */}
       <TouchableOpacity
-        style={[s.fab, { backgroundColor: isConnected ? PRIMARY : '#94a3b8' }]}
+        style={[s.fab, { backgroundColor: isConnected ? PRIMARY : c.textMuted }]}
         onPress={isConnected ? openCreate : () => Alert.alert('Sin conexión', 'La gestión de usuarios requiere conexión a internet.')}
       >
         <Ionicons name="person-add-outline" size={20} color="#fff" />
@@ -369,6 +380,7 @@ export default function UsuariosScreen() {
         onClose={() => { setModalVisible(false); setEditingUser(null) }}
         onDone={() => { setModalVisible(false); setEditingUser(null); onUpdate() }}
         isConnected={isConnected}
+        c={c}
       />
     </View>
   )
@@ -376,75 +388,77 @@ export default function UsuariosScreen() {
 
 // ─── Estilos ──────────────────────────────────────────────────────────────────
 
-const s = StyleSheet.create({
-  root:    { flex: 1, backgroundColor: '#f8fafc' },
-  centered:{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10, padding: 32 },
-  emptyText: { color: '#9ca3af', fontSize: 14 },
-  list:    { paddingBottom: 32 },
+function makeStyles(c: ReturnType<typeof import('@/lib/theme').useAppColors>) {
+  return StyleSheet.create({
+    root:    { flex: 1, backgroundColor: c.background },
+    centered:{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10, padding: 32 },
+    emptyText: { color: c.textMuted, fontSize: 14 },
+    list:    { paddingBottom: 32 },
 
-  topBar: {
-    flexDirection: 'row', gap: 20, paddingHorizontal: 16, paddingVertical: 12,
-    backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#f1f5f9',
-  },
-  counter:     { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  dot:         { width: 10, height: 10, borderRadius: 5 },
-  counterText: { fontSize: 13, color: '#374151' },
+    topBar: {
+      flexDirection: 'row', gap: 20, paddingHorizontal: 16, paddingVertical: 12,
+      backgroundColor: c.surface, borderBottomWidth: 1, borderBottomColor: c.surfaceAlt,
+    },
+    counter:     { flexDirection: 'row', alignItems: 'center', gap: 6 },
+    dot:         { width: 10, height: 10, borderRadius: 5 },
+    counterText: { fontSize: 13, color: c.textSecondary },
 
-  row: {
-    flexDirection: 'row', alignItems: 'center', gap: 12,
-    backgroundColor: '#fff', paddingHorizontal: 16, paddingVertical: 14,
-    borderBottomWidth: 1, borderBottomColor: '#f8fafc',
-  },
-  rowInactive: { backgroundColor: '#fafafa', opacity: 0.65 },
-  rowActions:  { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  iconBtn:     { padding: 8, borderRadius: 8, backgroundColor: '#f1f5f9' },
-  iconBtnRed:  { backgroundColor: '#fef2f2' },
+    row: {
+      flexDirection: 'row', alignItems: 'center', gap: 12,
+      backgroundColor: c.surface, paddingHorizontal: 16, paddingVertical: 14,
+      borderBottomWidth: 1, borderBottomColor: c.background,
+    },
+    rowInactive: { backgroundColor: c.surfaceAlt, opacity: 0.65 },
+    rowActions:  { flexDirection: 'row', alignItems: 'center', gap: 6 },
+    iconBtn:     { padding: 8, borderRadius: 8, backgroundColor: c.surfaceAlt },
+    iconBtnRed:  { backgroundColor: c.dangerLight },
 
-  avatar: {
-    width: 44, height: 44, borderRadius: 22,
-    alignItems: 'center', justifyContent: 'center',
-  },
-  avatarLetter: { fontSize: 18, fontWeight: '700' },
-  userName:     { fontSize: 15, fontWeight: '600', color: '#1e293b' },
-  userEmail:    { fontSize: 12, color: '#94a3b8', marginTop: 1 },
-  textMuted:    { color: '#94a3b8' },
-  roleBadge:    { alignSelf: 'flex-start', paddingHorizontal: 7, paddingVertical: 2, borderRadius: 5, marginTop: 4 },
-  roleBadgeText:{ fontSize: 11, fontWeight: '700' },
+    avatar: {
+      width: 44, height: 44, borderRadius: 22,
+      alignItems: 'center', justifyContent: 'center',
+    },
+    avatarLetter: { fontSize: 18, fontWeight: '700' },
+    userName:     { fontSize: 15, fontWeight: '600', color: c.text },
+    userEmail:    { fontSize: 12, color: c.textMuted, marginTop: 1 },
+    textMuted:    { color: c.textMuted },
+    roleBadge:    { alignSelf: 'flex-start', paddingHorizontal: 7, paddingVertical: 2, borderRadius: 5, marginTop: 4 },
+    roleBadgeText:{ fontSize: 11, fontWeight: '700' },
 
-  fab: {
-    position: 'absolute', bottom: 20, right: 16, left: 16,
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
-    borderRadius: 14, padding: 14,
-    shadowOpacity: 0.25, shadowRadius: 10, elevation: 6,
-  },
-  fabText: { color: '#fff', fontWeight: '700', fontSize: 15 },
+    fab: {
+      position: 'absolute', bottom: 20, right: 16, left: 16,
+      flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+      borderRadius: 14, padding: 14,
+      shadowOpacity: 0.25, shadowRadius: 10, elevation: 6,
+    },
+    fabText: { color: c.textInverse, fontWeight: '700', fontSize: 15 },
 
-  modalRoot:   { flex: 1, backgroundColor: '#fff' },
-  modalHeader: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 20, paddingVertical: 16,
-    borderBottomWidth: 1, borderBottomColor: '#f1f5f9',
-  },
-  modalTitle: { fontSize: 18, fontWeight: '700', color: '#0f172a' },
-  modalBody:  { padding: 20, gap: 12 },
+    modalRoot:   { flex: 1, backgroundColor: c.surface },
+    modalHeader: {
+      flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+      paddingHorizontal: 20, paddingVertical: 16,
+      borderBottomWidth: 1, borderBottomColor: c.border,
+    },
+    modalTitle: { fontSize: 18, fontWeight: '700', color: c.text },
+    modalBody:  { padding: 20, gap: 12 },
 
-  label: { fontSize: 13, fontWeight: '600', color: '#374151' },
-  input: {
-    borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 10,
-    padding: 12, fontSize: 15, backgroundColor: '#f8fafc', color: '#0f172a',
-  },
+    label: { fontSize: 13, fontWeight: '600', color: c.textSecondary },
+    input: {
+      borderWidth: 1, borderColor: c.border, borderRadius: 10,
+      padding: 12, fontSize: 15, backgroundColor: c.surfaceAlt, color: c.text,
+    },
 
-  roleGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  roleChip: {
-    paddingHorizontal: 14, paddingVertical: 9, borderRadius: 8,
-    borderWidth: 1, borderColor: '#e2e8f0', backgroundColor: '#f9fafb',
-  },
-  roleChipText: { fontSize: 13, fontWeight: '600', color: '#374151' },
-  roleHint:     { fontSize: 12, color: '#94a3b8', marginTop: -4 },
+    roleGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+    roleChip: {
+      paddingHorizontal: 14, paddingVertical: 9, borderRadius: 8,
+      borderWidth: 1, borderColor: c.border, backgroundColor: c.surfaceAlt,
+    },
+    roleChipText: { fontSize: 13, fontWeight: '600', color: c.textSecondary },
+    roleHint:     { fontSize: 12, color: c.textMuted, marginTop: -4 },
 
-  submitBtn:     { borderRadius: 12, padding: 15, alignItems: 'center', marginTop: 8 },
-  submitBtnText: { color: '#fff', fontWeight: '700', fontSize: 15 },
-  cancelBtn:     { borderRadius: 12, padding: 14, alignItems: 'center', borderWidth: 1, borderColor: '#e2e8f0' },
-  cancelBtnText: { color: '#64748b', fontWeight: '600', fontSize: 15 },
-  btnDisabled:   { opacity: 0.5 },
-})
+    submitBtn:     { borderRadius: 12, padding: 15, alignItems: 'center', marginTop: 8 },
+    submitBtnText: { color: c.textInverse, fontWeight: '700', fontSize: 15 },
+    cancelBtn:     { borderRadius: 12, padding: 14, alignItems: 'center', borderWidth: 1, borderColor: c.border },
+    cancelBtnText: { color: c.textMuted, fontWeight: '600', fontSize: 15 },
+    btnDisabled:   { opacity: 0.5 },
+  })
+}

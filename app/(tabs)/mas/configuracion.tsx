@@ -9,6 +9,7 @@ import { Ionicons } from '@expo/vector-icons'
 import { api } from '@/lib/api'
 import { useAuthStore } from '@/stores/auth-store'
 import { useNetworkStatus } from '@/hooks/use-network'
+import { useAppColors } from '@/lib/theme'
 import { ErrorView } from '@/components/ErrorView'
 
 const PRESET_COLORS = ['#2563eb', '#16a34a', '#dc2626', '#9333ea', '#ea580c', '#0891b2', '#be185d', '#d97706']
@@ -28,6 +29,8 @@ export default function ConfiguracionScreen() {
   const { tenant, user } = useAuthStore()
   const { isConnected } = useNetworkStatus()
   const PRIMARY = tenant?.primaryColor ?? '#2563eb'
+  const c = useAppColors()
+  const styles = makeStyles(c)
 
   const [saving, setSaving]     = useState(false)
   const [name, setName]         = useState('')
@@ -97,7 +100,7 @@ export default function ConfiguracionScreen() {
     <SafeAreaView style={styles.root}>
       {!isConnected && (
         <View style={styles.offlineBanner}>
-          <Ionicons name="cloud-offline-outline" size={14} color="#92400e" />
+          <Ionicons name="cloud-offline-outline" size={14} color={c.warning} />
           <Text style={styles.offlineBannerText}>Sin conexión — mostrando última configuración guardada</Text>
         </View>
       )}
@@ -113,6 +116,7 @@ export default function ConfiguracionScreen() {
             value={name}
             onChangeText={setName}
             placeholder="Nombre del negocio"
+            placeholderTextColor={c.textMuted}
             editable={isConnected}
           />
 
@@ -122,6 +126,7 @@ export default function ConfiguracionScreen() {
             value={currency}
             onChangeText={setCurrency}
             placeholder="$"
+            placeholderTextColor={c.textMuted}
             maxLength={5}
             editable={isConnected}
           />
@@ -131,11 +136,11 @@ export default function ConfiguracionScreen() {
         <View style={styles.card}>
           <Text style={styles.sectionTitle}>Color primario</Text>
           <View style={styles.colorRow}>
-            {PRESET_COLORS.map((c) => (
+            {PRESET_COLORS.map((pc) => (
               <TouchableOpacity
-                key={c}
-                style={[styles.colorChip, { backgroundColor: c }, color === c && styles.colorChipActive]}
-                onPress={isConnected ? () => setColor(c) : undefined}
+                key={pc}
+                style={[styles.colorChip, { backgroundColor: pc }, color === pc && styles.colorChipActive]}
+                onPress={isConnected ? () => setColor(pc) : undefined}
                 disabled={!isConnected}
               />
             ))}
@@ -145,6 +150,7 @@ export default function ConfiguracionScreen() {
             value={color}
             onChangeText={(v) => { if (/^#[0-9a-fA-F]{0,6}$/.test(v)) setColor(v) }}
             placeholder="#2563eb"
+            placeholderTextColor={c.textMuted}
             autoCapitalize="none"
             editable={isConnected}
           />
@@ -172,8 +178,8 @@ export default function ConfiguracionScreen() {
                 value={delivery[key]}
                 onValueChange={(v) => { if (isConnected) setDelivery((prev) => ({ ...prev, [key]: v })) }}
                 disabled={!isConnected}
-                trackColor={{ false: '#e5e7eb', true: PRIMARY + '88' }}
-                thumbColor={delivery[key] ? PRIMARY : '#9ca3af'}
+                trackColor={{ false: c.border, true: PRIMARY + '88' }}
+                thumbColor={delivery[key] ? PRIMARY : c.textMuted}
               />
             </View>
           ))}
@@ -181,7 +187,7 @@ export default function ConfiguracionScreen() {
 
         {/* Guardar */}
         <TouchableOpacity
-          style={[styles.saveBtn, { backgroundColor: isConnected ? PRIMARY : '#94a3b8' }, saving && styles.saveBtnDisabled]}
+          style={[styles.saveBtn, { backgroundColor: isConnected ? PRIMARY : c.textMuted }, saving && styles.saveBtnDisabled]}
           onPress={handleSave}
           disabled={saving || !isConnected}
         >
@@ -199,53 +205,55 @@ export default function ConfiguracionScreen() {
   )
 }
 
-const styles = StyleSheet.create({
-  root:   { flex: 1, backgroundColor: '#f8fafc' },
-  scroll: { padding: 16, gap: 16, paddingBottom: 40 },
+function makeStyles(c: ReturnType<typeof import('@/lib/theme').useAppColors>) {
+  return StyleSheet.create({
+    root:   { flex: 1, backgroundColor: c.background },
+    scroll: { padding: 16, gap: 16, paddingBottom: 40 },
 
-  offlineBanner: {
-    flexDirection: 'row', alignItems: 'center', gap: 6,
-    backgroundColor: '#fef3c7', paddingHorizontal: 16, paddingVertical: 8,
-    borderBottomWidth: 1, borderBottomColor: '#fde68a',
-  },
-  offlineBannerText: { fontSize: 12, color: '#92400e', flex: 1 },
+    offlineBanner: {
+      flexDirection: 'row', alignItems: 'center', gap: 6,
+      backgroundColor: c.warningLight, paddingHorizontal: 16, paddingVertical: 8,
+      borderBottomWidth: 1, borderBottomColor: c.warning,
+    },
+    offlineBannerText: { fontSize: 12, color: c.warning, flex: 1 },
 
-  card: {
-    backgroundColor: '#fff', borderRadius: 16, padding: 18,
-    shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 8, elevation: 2,
-    gap: 10,
-  },
-  sectionTitle: { fontSize: 16, fontWeight: '700', color: '#1e293b', marginBottom: 4 },
-  hint:         { fontSize: 13, color: '#94a3b8', marginBottom: 4 },
+    card: {
+      backgroundColor: c.surface, borderRadius: 16, padding: 18,
+      shadowColor: c.shadow, shadowOpacity: 0.05, shadowRadius: 8, elevation: 2,
+      gap: 10,
+    },
+    sectionTitle: { fontSize: 16, fontWeight: '700', color: c.text, marginBottom: 4 },
+    hint:         { fontSize: 13, color: c.textMuted, marginBottom: 4 },
 
-  label: { fontSize: 13, fontWeight: '600', color: '#374151' },
-  input: {
-    borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 10,
-    paddingHorizontal: 12, paddingVertical: 10,
-    fontSize: 15, color: '#1e293b', backgroundColor: '#f9fafb',
-  },
+    label: { fontSize: 13, fontWeight: '600', color: c.textSecondary },
+    input: {
+      borderWidth: 1, borderColor: c.border, borderRadius: 10,
+      paddingHorizontal: 12, paddingVertical: 10,
+      fontSize: 15, color: c.text, backgroundColor: c.surfaceAlt,
+    },
 
-  colorRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  colorChip: {
-    width: 36, height: 36, borderRadius: 18,
-    borderWidth: 2, borderColor: 'transparent',
-  },
-  colorChipActive: { borderColor: '#1e293b' },
-  colorPreview: {
-    height: 44, borderRadius: 10, alignItems: 'center', justifyContent: 'center', marginTop: 4,
-  },
-  colorPreviewText: { color: '#fff', fontWeight: '700', fontSize: 13 },
+    colorRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+    colorChip: {
+      width: 36, height: 36, borderRadius: 18,
+      borderWidth: 2, borderColor: 'transparent',
+    },
+    colorChipActive: { borderColor: c.text },
+    colorPreview: {
+      height: 44, borderRadius: 10, alignItems: 'center', justifyContent: 'center', marginTop: 4,
+    },
+    colorPreviewText: { color: '#fff', fontWeight: '700', fontSize: 13 },
 
-  switchRow: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingVertical: 6,
-  },
-  switchLabel: { fontSize: 15, color: '#374151' },
+    switchRow: {
+      flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+      paddingVertical: 6,
+    },
+    switchLabel: { fontSize: 15, color: c.textSecondary },
 
-  saveBtn: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
-    borderRadius: 14, padding: 16,
-  },
-  saveBtnDisabled: { opacity: 0.7 },
-  saveBtnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
-})
+    saveBtn: {
+      flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+      borderRadius: 14, padding: 16,
+    },
+    saveBtnDisabled: { opacity: 0.7 },
+    saveBtnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
+  })
+}

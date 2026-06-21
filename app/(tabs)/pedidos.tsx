@@ -12,6 +12,7 @@ import { useAuthStore } from '@/stores/auth-store'
 import { enqueueSync } from '@/lib/offline/sync-queue'
 import { useNetworkStatus } from '@/hooks/use-network'
 import { ErrorView } from '@/components/ErrorView'
+import { useAppColors } from '@/lib/theme'
 import { ORDER_STATUS_LABELS, ORDER_STATUS_COLORS, ORDER_TYPE_LABELS } from '@/types'
 import type { Order, OrderStatus } from '@/types'
 
@@ -35,6 +36,8 @@ const HIST_TABS: { key: 'all' | 'closed' | 'cancelled'; label: string }[] = [
 // ─── Fila de pedido ───────────────────────────────────────────────────────────
 
 function OrderRow({ order, onPress }: { order: Order; onPress: () => void }) {
+  const c = useAppColors()
+  const s = makeOrderRowStyles(c)
   const { tenant } = useAuthStore()
   const color = ORDER_STATUS_COLORS[order.status] ?? '#6b7280'
   const label = ORDER_STATUS_LABELS[order.status] ?? order.status
@@ -45,24 +48,40 @@ function OrderRow({ order, onPress }: { order: Order; onPress: () => void }) {
     : ORDER_TYPE_LABELS[order.type] ?? order.type
 
   return (
-    <TouchableOpacity style={styles.row} onPress={onPress} activeOpacity={0.75}>
+    <TouchableOpacity style={s.row} onPress={onPress} activeOpacity={0.75}>
       <View style={{ flex: 1 }}>
-        <Text style={styles.rowId}>{order.displayCode ?? `#${order.id.slice(-6).toUpperCase()}`}</Text>
-        <Text style={styles.rowMeta}>
+        <Text style={s.rowId}>{order.displayCode ?? `#${order.id.slice(-6).toUpperCase()}`}</Text>
+        <Text style={s.rowMeta}>
           {origin}
           {order.customerName ? `  ·  ${order.customerName}` : ''}
           {order.createdAt ? `  ·  ${formatDateTime(order.createdAt)}` : ''}
         </Text>
-        <Text style={styles.rowItems}>{(order as any).itemsCount ?? order.items?.length ?? 0} producto(s)</Text>
+        <Text style={s.rowItems}>{(order as any).itemsCount ?? order.items?.length ?? 0} producto(s)</Text>
       </View>
       <View style={{ alignItems: 'flex-end', gap: 6 }}>
-        <Text style={styles.rowTotal}>{formatCurrency(parseFloat(order.total), sign)}</Text>
-        <View style={[styles.badge, { backgroundColor: color + '22' }]}>
-          <Text style={[styles.badgeText, { color }]}>{label}</Text>
+        <Text style={s.rowTotal}>{formatCurrency(parseFloat(order.total), sign)}</Text>
+        <View style={[s.badge, { backgroundColor: color + '22' }]}>
+          <Text style={[s.badgeText, { color }]}>{label}</Text>
         </View>
       </View>
     </TouchableOpacity>
   )
+}
+
+function makeOrderRowStyles(c: ReturnType<typeof useAppColors>) {
+  return StyleSheet.create({
+    row: {
+      flexDirection: 'row', backgroundColor: c.surface,
+      marginHorizontal: 12, marginTop: 10, borderRadius: 12, padding: 14,
+      shadowColor: c.shadow, shadowOpacity: 0.04, shadowRadius: 6, elevation: 2,
+    },
+    rowId:    { fontSize: 15, fontWeight: '700', color: c.text },
+    rowMeta:  { fontSize: 12, color: c.textMuted, marginTop: 2 },
+    rowItems: { fontSize: 12, color: c.textMuted, marginTop: 4 },
+    rowTotal: { fontSize: 15, fontWeight: '700', color: c.text },
+    badge:    { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 },
+    badgeText:{ fontSize: 11, fontWeight: '600' },
+  })
 }
 
 // ─── Modal: Cobrar pedido ─────────────────────────────────────────────────────
@@ -74,6 +93,8 @@ function PayModal({ order, onClose, onRefresh }: {
   onClose: () => void
   onRefresh: () => void
 }) {
+  const c = useAppColors()
+  const s = makePayStyles(c)
   const { tenant, config } = useAuthStore()
   const PRIMARY = tenant?.primaryColor ?? '#2563eb'
   const sign    = tenant?.currencySign ?? '$'
@@ -89,7 +110,7 @@ function PayModal({ order, onClose, onRefresh }: {
 
   const tipNum      = parseFloat(tip) || 0
   const grandTotal  = orderTotal + tipNum
-  const totalPaid   = payments.reduce((s, p) => s + (parseFloat(p.amount) || 0), 0)
+  const totalPaid   = payments.reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0)
   const remaining   = grandTotal - totalPaid
   const hasCash     = payments.some((p) => p.method === 'cash' && p.amount !== '')
   const isCredit    = !!(methods.find((m) => m.key === payments[0]?.method)?.isCredit)
@@ -139,11 +160,11 @@ function PayModal({ order, onClose, onRefresh }: {
 
   return (
     <Modal visible animationType="slide" presentationStyle="pageSheet">
-      <SafeAreaView style={styles.detailRoot}>
-        <View style={styles.detailHeader}>
-          <Text style={styles.detailTitle}>Cobrar pedido</Text>
+      <SafeAreaView style={s.detailRoot}>
+        <View style={s.detailHeader}>
+          <Text style={s.detailTitle}>Cobrar pedido</Text>
           <TouchableOpacity onPress={onClose}>
-            <Ionicons name="close" size={24} color="#374151" />
+            <Ionicons name="close" size={24} color={c.textSecondary} />
           </TouchableOpacity>
         </View>
 
@@ -151,72 +172,73 @@ function PayModal({ order, onClose, onRefresh }: {
           <ScrollView contentContainerStyle={{ padding: 20, gap: 16 }}>
 
             {/* Totales */}
-            <View style={[styles.payTotal, { borderColor: PRIMARY + '40' }]}>
+            <View style={[s.payTotal, { borderColor: PRIMARY + '40' }]}>
               <View style={{ flex: 1, gap: 4 }}>
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                  <Text style={styles.payTotalLabel}>Pedido</Text>
-                  <Text style={[styles.payTotalLabel, { color: '#0f172a' }]}>{formatCurrency(orderTotal, sign)}</Text>
+                  <Text style={s.payTotalLabel}>Pedido</Text>
+                  <Text style={[s.payTotalLabel, { color: c.text }]}>{formatCurrency(orderTotal, sign)}</Text>
                 </View>
                 {tipNum > 0 && (
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                    <Text style={styles.payTotalLabel}>Propina</Text>
-                    <Text style={[styles.payTotalLabel, { color: '#0f172a' }]}>{formatCurrency(tipNum, sign)}</Text>
+                    <Text style={s.payTotalLabel}>Propina</Text>
+                    <Text style={[s.payTotalLabel, { color: c.text }]}>{formatCurrency(tipNum, sign)}</Text>
                   </View>
                 )}
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 4, paddingTop: 4, borderTopWidth: 1, borderTopColor: PRIMARY + '30' }}>
-                  <Text style={[styles.payTotalLabel, { fontWeight: '700' }]}>Total</Text>
-                  <Text style={[styles.payTotalValue, { color: PRIMARY }]}>{formatCurrency(grandTotal, sign)}</Text>
+                  <Text style={[s.payTotalLabel, { fontWeight: '700' }]}>Total</Text>
+                  <Text style={[s.payTotalValue, { color: PRIMARY }]}>{formatCurrency(grandTotal, sign)}</Text>
                 </View>
               </View>
             </View>
 
             {/* Pagos */}
             <View style={{ gap: 8 }}>
-              <Text style={styles.payLabel}>Pagos</Text>
+              <Text style={s.payLabel}>Pagos</Text>
               {payments.map((row, idx) => (
-                <View key={idx} style={styles.payRow}>
+                <View key={idx} style={s.payRow}>
                   {/* Selector de método */}
                   <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ maxHeight: 38 }} contentContainerStyle={{ gap: 6, paddingRight: 4 }}>
                     {methods.map((m) => (
                       <TouchableOpacity
                         key={m.key}
-                        style={[styles.methodChip, row.method === m.key && { backgroundColor: PRIMARY, borderColor: PRIMARY }]}
+                        style={[s.methodChip, row.method === m.key && { backgroundColor: PRIMARY, borderColor: PRIMARY }]}
                         onPress={() => updateRow(idx, 'method', m.key)}
                       >
-                        <Text style={[styles.methodChipText, row.method === m.key && { color: '#fff' }]}>{m.label}</Text>
+                        <Text style={[s.methodChipText, row.method === m.key && { color: c.textInverse }]}>{m.label}</Text>
                       </TouchableOpacity>
                     ))}
                   </ScrollView>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8 }}>
                     <TextInput
-                      style={[styles.payInput, { flex: 1 }]}
+                      style={[s.payInput, { flex: 1 }]}
                       keyboardType="numeric"
                       placeholder={`Monto (${sign})`}
+                      placeholderTextColor={c.textMuted}
                       value={row.amount}
                       onChangeText={(v) => updateRow(idx, 'amount', v)}
                     />
                     {payments.length > 1 && (
-                      <TouchableOpacity onPress={() => removeRow(idx)} style={styles.removePayBtn}>
-                        <Ionicons name="trash-outline" size={18} color="#ef4444" />
+                      <TouchableOpacity onPress={() => removeRow(idx)} style={s.removePayBtn}>
+                        <Ionicons name="trash-outline" size={18} color={c.danger} />
                       </TouchableOpacity>
                     )}
                   </View>
                 </View>
               ))}
 
-              <TouchableOpacity style={[styles.addPayBtn, { borderColor: PRIMARY }]} onPress={addRow}>
+              <TouchableOpacity style={[s.addPayBtn, { borderColor: PRIMARY }]} onPress={addRow}>
                 <Ionicons name="add-circle-outline" size={16} color={PRIMARY} />
-                <Text style={[styles.addPayBtnText, { color: PRIMARY }]}>Agregar método</Text>
+                <Text style={[s.addPayBtnText, { color: PRIMARY }]}>Agregar método</Text>
               </TouchableOpacity>
             </View>
 
             {/* Resumen de cobro */}
             {totalPaid > 0 && (
-              <View style={[styles.changeBox, remaining <= 0.01 ? styles.changePos : styles.changeNeg]}>
-                <Text style={styles.changeLabel}>
+              <View style={[s.changeBox, remaining <= 0.01 ? s.changePos : s.changeNeg]}>
+                <Text style={s.changeLabel}>
                   {remaining <= 0.01 ? (remaining < -0.01 ? 'Cambio a devolver' : 'Exacto') : 'Falta por cubrir'}
                 </Text>
-                <Text style={styles.changeValue}>
+                <Text style={s.changeValue}>
                   {remaining < -0.01 ? formatCurrency(Math.abs(remaining), sign) : remaining > 0.01 ? formatCurrency(remaining, sign) : '—'}
                 </Text>
               </View>
@@ -224,11 +246,12 @@ function PayModal({ order, onClose, onRefresh }: {
 
             {/* Propina */}
             <View style={{ gap: 8 }}>
-              <Text style={styles.payLabel}>Propina (opcional)</Text>
+              <Text style={s.payLabel}>Propina (opcional)</Text>
               <TextInput
-                style={styles.payInput}
+                style={s.payInput}
                 keyboardType="numeric"
                 placeholder={`0 ${sign}`}
+                placeholderTextColor={c.textMuted}
                 value={tip}
                 onChangeText={setTip}
               />
@@ -237,10 +260,11 @@ function PayModal({ order, onClose, onRefresh }: {
             {/* Nombre del cliente — obligatorio para crédito */}
             {isCredit && (
               <View style={{ gap: 8 }}>
-                <Text style={styles.payLabel}>Nombre del cliente *</Text>
+                <Text style={s.payLabel}>Nombre del cliente *</Text>
                 <TextInput
-                  style={styles.payInput}
+                  style={s.payInput}
                   placeholder="Nombre completo de quien debe"
+                  placeholderTextColor={c.textMuted}
                   value={customerName}
                   onChangeText={setCustomerName}
                   autoCapitalize="words"
@@ -250,10 +274,11 @@ function PayModal({ order, onClose, onRefresh }: {
 
             {/* Notas */}
             <View style={{ gap: 8 }}>
-              <Text style={styles.payLabel}>{isCredit ? 'Observaciones *' : 'Notas (opcional)'}</Text>
+              <Text style={s.payLabel}>{isCredit ? 'Observaciones *' : 'Notas (opcional)'}</Text>
               <TextInput
-                style={[styles.payInput, { minHeight: 60, textAlignVertical: 'top' }]}
+                style={[s.payInput, { minHeight: 60, textAlignVertical: 'top' }]}
                 placeholder={isCredit ? 'Motivo, plazo de pago, referencia...' : 'Observaciones del pago...'}
+                placeholderTextColor={c.textMuted}
                 value={notes}
                 onChangeText={setNotes}
                 multiline
@@ -262,22 +287,72 @@ function PayModal({ order, onClose, onRefresh }: {
 
             <TouchableOpacity
               style={[
-                styles.confirmBtn,
+                s.confirmBtn,
                 { backgroundColor: isCredit ? '#d97706' : PRIMARY },
-                (loading || (isCredit && (!customerName.trim() || !notes.trim()))) && styles.btnDisabled,
+                (loading || (isCredit && (!customerName.trim() || !notes.trim()))) && s.btnDisabled,
               ]}
               onPress={confirm}
               disabled={loading || (isCredit && (!customerName.trim() || !notes.trim()))}
             >
               {loading
-                ? <ActivityIndicator color="#fff" />
-                : <Text style={styles.confirmBtnText}>{isCredit ? 'Registrar deuda' : 'Confirmar cobro'}</Text>}
+                ? <ActivityIndicator color={c.textInverse} />
+                : <Text style={s.confirmBtnText}>{isCredit ? 'Registrar deuda' : 'Confirmar cobro'}</Text>}
             </TouchableOpacity>
           </ScrollView>
         </KeyboardAvoidingView>
       </SafeAreaView>
     </Modal>
   )
+}
+
+function makePayStyles(c: ReturnType<typeof useAppColors>) {
+  return StyleSheet.create({
+    detailRoot: { flex: 1, backgroundColor: c.surface },
+    detailHeader: {
+      flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+      paddingHorizontal: 20, paddingVertical: 16,
+      borderBottomWidth: 1, borderBottomColor: c.border,
+    },
+    detailTitle:  { fontSize: 18, fontWeight: '700', color: c.text },
+    btnDisabled:  { opacity: 0.5 },
+
+    payTotal: {
+      borderWidth: 2, borderRadius: 12, padding: 16,
+      flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    },
+    payTotalLabel: { fontSize: 14, fontWeight: '600', color: c.textSecondary },
+    payTotalValue: { fontSize: 24, fontWeight: '800' },
+    payLabel:      { fontSize: 13, fontWeight: '600', color: c.textSecondary },
+    payInput: {
+      borderWidth: 1, borderColor: c.border, borderRadius: 10,
+      padding: 12, fontSize: 16, backgroundColor: c.surfaceAlt, color: c.text,
+    },
+    payRow: {
+      backgroundColor: c.surfaceAlt, borderRadius: 10, padding: 12,
+      borderWidth: 1, borderColor: c.border,
+    },
+    removePayBtn: { padding: 6 },
+    addPayBtn: {
+      flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
+      borderWidth: 1, borderStyle: 'dashed', borderRadius: 10, paddingVertical: 10,
+    },
+    addPayBtnText: { fontSize: 13, fontWeight: '600' },
+    methodChip: {
+      paddingHorizontal: 14, paddingVertical: 8, borderRadius: 8,
+      borderWidth: 1, borderColor: c.border, backgroundColor: c.surface,
+    },
+    methodChipText:{ fontSize: 13, fontWeight: '600', color: c.textSecondary },
+    changeBox: {
+      borderRadius: 10, padding: 12,
+      flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    },
+    changePos:   { backgroundColor: c.successLight },
+    changeNeg:   { backgroundColor: c.dangerLight },
+    changeLabel: { fontSize: 13, fontWeight: '600', color: c.textSecondary },
+    changeValue: { fontSize: 18, fontWeight: '800', color: c.text },
+    confirmBtn:  { borderRadius: 12, padding: 16, alignItems: 'center', marginTop: 8 },
+    confirmBtnText: { color: '#fff', fontWeight: '700', fontSize: 15 },
+  })
 }
 
 // ─── Modal detalle ────────────────────────────────────────────────────────────
@@ -289,6 +364,8 @@ function DetailModal({ order: orderProp, onClose, onRefresh, onRefreshDetail, re
   onRefreshDetail?: () => Promise<void>
   readOnly?: boolean
 }) {
+  const c = useAppColors()
+  const s = makeDetailStyles(c)
   const { tenant } = useAuthStore()
   const qc = useQueryClient()
   const PRIMARY = tenant?.primaryColor ?? '#2563eb'
@@ -426,65 +503,65 @@ function DetailModal({ order: orderProp, onClose, onRefresh, onRefreshDetail, re
   return (
     <>
       <Modal visible animationType="slide" presentationStyle="pageSheet">
-        <SafeAreaView style={styles.detailRoot}>
-          <View style={styles.detailHeader}>
-            <Text style={styles.detailTitle}>
+        <SafeAreaView style={s.detailRoot}>
+          <View style={s.detailHeader}>
+            <Text style={s.detailTitle}>
               {order.displayCode ?? `Pedido #${order.id.slice(-6).toUpperCase()}`}
             </Text>
             <TouchableOpacity onPress={onClose}>
-              <Ionicons name="close" size={24} color="#374151" />
+              <Ionicons name="close" size={24} color={c.textSecondary} />
             </TouchableOpacity>
           </View>
 
           <ScrollView contentContainerStyle={{ paddingBottom: 24 }}>
-            <View style={styles.detailSection}>
-              <View style={[styles.badge, { backgroundColor: color + '22', alignSelf: 'flex-start', marginBottom: 10 }]}>
-                <Text style={[styles.badgeText, { color }]}>{label}</Text>
+            <View style={s.detailSection}>
+              <View style={[s.badge, { backgroundColor: color + '22', alignSelf: 'flex-start', marginBottom: 10 }]}>
+                <Text style={[s.badgeText, { color }]}>{label}</Text>
               </View>
-              <Text style={styles.meta}>Tipo: {ORDER_TYPE_LABELS[order.type] ?? order.type}</Text>
-              {order.tableName    && <Text style={styles.meta}>Mesa: {order.tableName}</Text>}
-              {order.customerName && <Text style={styles.meta}>Cliente: {order.customerName}</Text>}
-              {order.createdAt    && <Text style={styles.meta}>Hora: {formatDateTime(order.createdAt)}</Text>}
-              {order.notes        && <Text style={styles.meta}>Nota: {order.notes}</Text>}
+              <Text style={s.meta}>Tipo: {ORDER_TYPE_LABELS[order.type] ?? order.type}</Text>
+              {order.tableName    && <Text style={s.meta}>Mesa: {order.tableName}</Text>}
+              {order.customerName && <Text style={s.meta}>Cliente: {order.customerName}</Text>}
+              {order.createdAt    && <Text style={s.meta}>Hora: {formatDateTime(order.createdAt)}</Text>}
+              {order.notes        && <Text style={s.meta}>Nota: {order.notes}</Text>}
             </View>
 
             {order.items && order.items.length > 0 && (
-              <View style={styles.detailSection}>
-                <Text style={styles.detailSectionTitle}>Productos</Text>
+              <View style={s.detailSection}>
+                <Text style={s.detailSectionTitle}>Productos</Text>
                 {order.items.map((item) => {
                   const name = (item.productSnapshot as any)?.name ?? 'Producto'
-                  const isCancelled = item.status === 'cancelled'
+                  const isCancelled  = item.status === 'cancelled'
                   const isCancelling = cancellingItem === item.id
                   return (
-                    <View key={item.id} style={[styles.detailItem, isCancelled && styles.detailItemCancelled]}>
-                      <Text style={[styles.detailQty, { color: isCancelled ? '#9ca3af' : PRIMARY }]}>
+                    <View key={item.id} style={[s.detailItem, isCancelled && s.detailItemCancelled]}>
+                      <Text style={[s.detailQty, { color: isCancelled ? c.textMuted : PRIMARY }]}>
                         {item.quantity}×
                       </Text>
                       <View style={{ flex: 1 }}>
-                        <Text style={[styles.detailName, isCancelled && { color: '#9ca3af', textDecorationLine: 'line-through' }]}>
+                        <Text style={[s.detailName, isCancelled && { color: c.textMuted, textDecorationLine: 'line-through' }]}>
                           {name}
                         </Text>
                         {Array.isArray(item.modifierSnapshot) && item.modifierSnapshot.length > 0 && (
-                          <Text style={styles.detailMods}>
+                          <Text style={s.detailMods}>
                             {(item.modifierSnapshot as any[]).map((m) => m.modifierName).join(' · ')}
                           </Text>
                         )}
-                        {item.notes ? <Text style={[styles.detailMods, { color: '#f97316' }]}>⚠ {item.notes}</Text> : null}
-                        {isCancelled && <Text style={styles.cancelledTag}>Cancelado</Text>}
+                        {item.notes ? <Text style={[s.detailMods, { color: '#f97316' }]}>⚠ {item.notes}</Text> : null}
+                        {isCancelled && <Text style={s.cancelledTag}>Cancelado</Text>}
                       </View>
                       <View style={{ alignItems: 'flex-end', gap: 4 }}>
-                        <Text style={[styles.detailItemTotal, isCancelled && { color: '#9ca3af', textDecorationLine: 'line-through' }]}>
+                        <Text style={[s.detailItemTotal, isCancelled && { color: c.textMuted, textDecorationLine: 'line-through' }]}>
                           {formatCurrency(parseFloat(item.itemTotal), sign)}
                         </Text>
                         {canCancelItem && !isCancelled && (
                           isCancelling
-                            ? <ActivityIndicator size="small" color="#ef4444" />
+                            ? <ActivityIndicator size="small" color={c.danger} />
                             : (
                               <TouchableOpacity
-                                style={styles.itemCancelBtn}
+                                style={s.itemCancelBtn}
                                 onPress={() => cancelItem(item.id, name)}
                               >
-                                <Ionicons name="close-circle-outline" size={18} color="#ef4444" />
+                                <Ionicons name="close-circle-outline" size={18} color={c.danger} />
                               </TouchableOpacity>
                             )
                         )}
@@ -495,57 +572,57 @@ function DetailModal({ order: orderProp, onClose, onRefresh, onRefreshDetail, re
               </View>
             )}
 
-            <View style={[styles.detailSection, { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }]}>
-              <Text style={{ fontSize: 15, fontWeight: '600', color: '#374151' }}>Total</Text>
-              <Text style={{ fontSize: 22, fontWeight: '800', color: '#0f172a' }}>
+            <View style={[s.detailSection, { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }]}>
+              <Text style={{ fontSize: 15, fontWeight: '600', color: c.textSecondary }}>Total</Text>
+              <Text style={{ fontSize: 22, fontWeight: '800', color: c.text }}>
                 {formatCurrency(parseFloat(order.total), sign)}
               </Text>
             </View>
           </ScrollView>
 
           {!readOnly && (
-            <View style={styles.detailFooter}>
+            <View style={s.detailFooter}>
               {canAdvance && (
                 <TouchableOpacity
-                  style={[styles.advBtn, { backgroundColor: PRIMARY }, loading && styles.btnDisabled]}
+                  style={[s.advBtn, { backgroundColor: PRIMARY }, loading && s.btnDisabled]}
                   onPress={() => advance(NEXT_STATUS[order.status])}
                   disabled={loading}
                 >
                   {loading
-                    ? <ActivityIndicator color="#fff" />
-                    : <Text style={styles.advBtnText}>{ADVANCE_LABELS[order.status] ?? 'Avanzar'}</Text>}
+                    ? <ActivityIndicator color={c.textInverse} />
+                    : <Text style={s.advBtnText}>{ADVANCE_LABELS[order.status] ?? 'Avanzar'}</Text>}
                 </TouchableOpacity>
               )}
 
               {canDeliver && (
                 <TouchableOpacity
-                  style={[styles.advBtn, { backgroundColor: '#10b981' }, loading && styles.btnDisabled]}
+                  style={[s.advBtn, { backgroundColor: '#10b981' }, loading && s.btnDisabled]}
                   onPress={() => advance('delivered')}
                   disabled={loading}
                 >
-                  <Ionicons name="checkmark-circle-outline" size={18} color="#fff" />
-                  <Text style={styles.advBtnText}>Entregar</Text>
+                  <Ionicons name="checkmark-circle-outline" size={18} color={c.textInverse} />
+                  <Text style={s.advBtnText}>Entregar</Text>
                 </TouchableOpacity>
               )}
 
               {canPay && (
                 <TouchableOpacity
-                  style={[styles.advBtn, { backgroundColor: '#059669' }, loading && styles.btnDisabled]}
+                  style={[s.advBtn, { backgroundColor: '#059669' }, loading && s.btnDisabled]}
                   onPress={() => setPayOpen(true)}
                   disabled={loading}
                 >
-                  <Ionicons name="cash-outline" size={18} color="#fff" />
-                  <Text style={styles.advBtnText}>Cobrar</Text>
+                  <Ionicons name="cash-outline" size={18} color={c.textInverse} />
+                  <Text style={s.advBtnText}>Cobrar</Text>
                 </TouchableOpacity>
               )}
 
               {canCancel && (
                 <TouchableOpacity
-                  style={[styles.cancelBtn, loading && styles.btnDisabled]}
+                  style={[s.cancelBtn, loading && s.btnDisabled]}
                   onPress={cancel}
                   disabled={loading}
                 >
-                  <Text style={styles.cancelBtnText}>Cancelar pedido</Text>
+                  <Text style={s.cancelBtnText}>Cancelar pedido</Text>
                 </TouchableOpacity>
               )}
             </View>
@@ -564,9 +641,45 @@ function DetailModal({ order: orderProp, onClose, onRefresh, onRefreshDetail, re
   )
 }
 
+function makeDetailStyles(c: ReturnType<typeof useAppColors>) {
+  return StyleSheet.create({
+    detailRoot: { flex: 1, backgroundColor: c.surface },
+    detailHeader: {
+      flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+      paddingHorizontal: 20, paddingVertical: 16,
+      borderBottomWidth: 1, borderBottomColor: c.border,
+    },
+    detailTitle:  { fontSize: 18, fontWeight: '700', color: c.text },
+    detailSection:{ padding: 20, borderBottomWidth: 1, borderBottomColor: c.background },
+    detailSectionTitle: { fontSize: 11, fontWeight: '700', color: c.textMuted, textTransform: 'uppercase', marginBottom: 10, letterSpacing: 0.5 },
+    meta:         { fontSize: 14, color: c.textSecondary, marginBottom: 3 },
+    badge:        { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 },
+    badgeText:    { fontSize: 11, fontWeight: '600' },
+    detailItem:   { flexDirection: 'row', alignItems: 'flex-start', paddingVertical: 6, gap: 8 },
+    detailQty:    { fontSize: 14, fontWeight: '700', minWidth: 26 },
+    detailName:   { fontSize: 14, fontWeight: '600', color: c.text },
+    detailMods:   { fontSize: 12, color: c.textMuted, marginTop: 2 },
+    detailItemTotal:    { fontSize: 13, fontWeight: '600', color: c.textSecondary },
+    detailItemCancelled:{ opacity: 0.6 },
+    cancelledTag: { fontSize: 11, color: c.danger, fontWeight: '600', marginTop: 2 },
+    itemCancelBtn:{ padding: 2 },
+    detailFooter: { padding: 20, gap: 10, borderTopWidth: 1, borderTopColor: c.border },
+    advBtn: {
+      flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+      borderRadius: 12, padding: 14,
+    },
+    advBtnText:   { color: '#fff', fontWeight: '700', fontSize: 15 },
+    cancelBtn:    { borderWidth: 1, borderColor: c.danger, borderRadius: 12, padding: 14, alignItems: 'center', backgroundColor: c.dangerLight },
+    cancelBtnText:{ color: c.danger, fontWeight: '600', fontSize: 14 },
+    btnDisabled:  { opacity: 0.5 },
+  })
+}
+
 // ─── Pantalla principal ───────────────────────────────────────────────────────
 
 export default function PedidosScreen() {
+  const c = useAppColors()
+  const s = makePedidosStyles(c)
   const qc = useQueryClient()
   const { tenant } = useAuthStore()
   const PRIMARY = tenant?.primaryColor ?? '#2563eb'
@@ -590,7 +703,7 @@ export default function PedidosScreen() {
     staleTime: 60_000,
   })
 
-  const activeOrders   = activeQuery.data ?? []
+  const activeOrders    = activeQuery.data ?? []
   const historialOrders = historialQuery.data ?? []
 
   const isLoading    = mode === 'active' ? activeQuery.isLoading : historialQuery.isLoading
@@ -635,27 +748,27 @@ export default function PedidosScreen() {
     : (k: any) => setHistTab(k)
 
   return (
-    <View style={styles.root}>
+    <View style={s.root}>
       {/* Mode toggle */}
-      <View style={styles.modeBar}>
+      <View style={s.modeBar}>
         <TouchableOpacity
-          style={[styles.modeBtn, mode === 'active' && { backgroundColor: PRIMARY }]}
+          style={[s.modeBtn, mode === 'active' && { backgroundColor: PRIMARY }]}
           onPress={() => setMode('active')}
         >
-          <Text style={[styles.modeBtnText, mode === 'active' && { color: '#fff' }]}>En curso</Text>
+          <Text style={[s.modeBtnText, mode === 'active' && { color: c.textInverse }]}>En curso</Text>
         </TouchableOpacity>
         <TouchableOpacity
-          style={[styles.modeBtn, mode === 'historial' && { backgroundColor: PRIMARY }]}
+          style={[s.modeBtn, mode === 'historial' && { backgroundColor: PRIMARY }]}
           onPress={() => setMode('historial')}
         >
-          <Text style={[styles.modeBtnText, mode === 'historial' && { color: '#fff' }]}>Historial</Text>
+          <Text style={[s.modeBtnText, mode === 'historial' && { color: c.textInverse }]}>Historial</Text>
         </TouchableOpacity>
       </View>
 
       {/* Status sub-tabs */}
       <ScrollView
         horizontal showsHorizontalScrollIndicator={false}
-        style={styles.tabBar} contentContainerStyle={styles.tabContent}
+        style={s.tabBar} contentContainerStyle={s.tabContent}
       >
         {tabs.map((t) => {
           const count  = t.key === 'all'
@@ -665,10 +778,10 @@ export default function PedidosScreen() {
           return (
             <TouchableOpacity
               key={t.key}
-              style={[styles.tab, active && { backgroundColor: PRIMARY }]}
+              style={[s.tab, active && { backgroundColor: PRIMARY }]}
               onPress={() => setTab(t.key)}
             >
-              <Text style={[styles.tabText, active && { color: '#fff' }]}>
+              <Text style={[s.tabText, active && { color: c.textInverse }]}>
                 {t.label}{count > 0 ? ` (${count})` : ''}
               </Text>
             </TouchableOpacity>
@@ -677,7 +790,7 @@ export default function PedidosScreen() {
       </ScrollView>
 
       {isLoading
-        ? <View style={styles.centered}><ActivityIndicator size="large" color={PRIMARY} /></View>
+        ? <View style={s.centered}><ActivityIndicator size="large" color={PRIMARY} /></View>
         : isError
         ? <ErrorView message="No se pudieron cargar los pedidos." onRetry={refetch} />
         : (
@@ -685,12 +798,12 @@ export default function PedidosScreen() {
             data={filtered}
             keyExtractor={(o) => o.id}
             renderItem={({ item }) => <OrderRow order={item} onPress={() => openDetail(item)} />}
-            contentContainerStyle={styles.list}
+            contentContainerStyle={s.list}
             refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refresh} tintColor={PRIMARY} />}
             ListEmptyComponent={
-              <View style={styles.centered}>
-                <Ionicons name="receipt-outline" size={48} color="#d1d5db" />
-                <Text style={styles.emptyText}>
+              <View style={s.centered}>
+                <Ionicons name="receipt-outline" size={48} color={c.border} />
+                <Text style={s.emptyText}>
                   {mode === 'historial' ? 'Sin pedidos en el historial' : 'Sin pedidos en esta categoría'}
                 </Text>
               </View>
@@ -710,106 +823,27 @@ export default function PedidosScreen() {
   )
 }
 
-// ─── Estilos ──────────────────────────────────────────────────────────────────
+function makePedidosStyles(c: ReturnType<typeof useAppColors>) {
+  return StyleSheet.create({
+    root:      { flex: 1, backgroundColor: c.background },
+    centered:  { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32, gap: 12 },
+    emptyText: { color: c.textMuted, fontSize: 14 },
+    list:      { paddingBottom: 24 },
 
-const styles = StyleSheet.create({
-  root:      { flex: 1, backgroundColor: '#f8fafc' },
-  centered:  { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32, gap: 12 },
-  emptyText: { color: '#9ca3af', fontSize: 14 },
+    modeBar: {
+      flexDirection: 'row', backgroundColor: c.surface,
+      padding: 8, gap: 6,
+      borderBottomWidth: 1, borderBottomColor: c.border,
+    },
+    modeBtn: {
+      flex: 1, paddingVertical: 8, borderRadius: 8, alignItems: 'center',
+      backgroundColor: c.surfaceAlt,
+    },
+    modeBtnText: { fontSize: 13, fontWeight: '600', color: c.textSecondary },
 
-  modeBar: {
-    flexDirection: 'row', backgroundColor: '#fff',
-    padding: 8, gap: 6,
-    borderBottomWidth: 1, borderBottomColor: '#f1f5f9',
-  },
-  modeBtn: {
-    flex: 1, paddingVertical: 8, borderRadius: 8, alignItems: 'center',
-    backgroundColor: '#f1f5f9',
-  },
-  modeBtnText: { fontSize: 13, fontWeight: '600', color: '#374151' },
-
-  tabBar:    { backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#f1f5f9' },
-  tabContent:{ paddingHorizontal: 12, paddingVertical: 10, gap: 6, flexDirection: 'row', alignItems: 'center' },
-  tab:       { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, backgroundColor: '#f1f5f9' },
-  tabText:   { fontSize: 13, color: '#6b7280', fontWeight: '600' },
-
-  list: { paddingBottom: 24 },
-  row: {
-    flexDirection: 'row', backgroundColor: '#fff',
-    marginHorizontal: 12, marginTop: 10, borderRadius: 12, padding: 14,
-    shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 6, elevation: 2,
-  },
-  rowId:    { fontSize: 15, fontWeight: '700', color: '#1e293b' },
-  rowMeta:  { fontSize: 12, color: '#94a3b8', marginTop: 2 },
-  rowItems: { fontSize: 12, color: '#64748b', marginTop: 4 },
-  rowTotal: { fontSize: 15, fontWeight: '700', color: '#0f172a' },
-  badge:    { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 },
-  badgeText:{ fontSize: 11, fontWeight: '600' },
-
-  detailRoot: { flex: 1, backgroundColor: '#fff' },
-  detailHeader: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 20, paddingVertical: 16,
-    borderBottomWidth: 1, borderBottomColor: '#f1f5f9',
-  },
-  detailTitle:  { fontSize: 18, fontWeight: '700', color: '#0f172a' },
-  detailSection:{ padding: 20, borderBottomWidth: 1, borderBottomColor: '#f8fafc' },
-  detailSectionTitle: { fontSize: 11, fontWeight: '700', color: '#9ca3af', textTransform: 'uppercase', marginBottom: 10, letterSpacing: 0.5 },
-  meta:         { fontSize: 14, color: '#374151', marginBottom: 3 },
-  detailItem:   { flexDirection: 'row', alignItems: 'flex-start', paddingVertical: 6, gap: 8 },
-  detailQty:    { fontSize: 14, fontWeight: '700', minWidth: 26 },
-  detailName:   { fontSize: 14, fontWeight: '600', color: '#1e293b' },
-  detailMods:   { fontSize: 12, color: '#94a3b8', marginTop: 2 },
-  detailItemTotal: { fontSize: 13, fontWeight: '600', color: '#374151' },
-  detailFooter: { padding: 20, gap: 10, borderTopWidth: 1, borderTopColor: '#f1f5f9' },
-  advBtn: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
-    borderRadius: 12, padding: 14,
-  },
-  advBtnText:   { color: '#fff', fontWeight: '700', fontSize: 15 },
-  cancelBtn:    { borderWidth: 1, borderColor: '#fca5a5', borderRadius: 12, padding: 14, alignItems: 'center', backgroundColor: '#fff5f5' },
-  cancelBtnText:{ color: '#ef4444', fontWeight: '600', fontSize: 14 },
-  btnDisabled:  { opacity: 0.5 },
-
-  payTotal: {
-    borderWidth: 2, borderRadius: 12, padding: 16,
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-  },
-  payTotalLabel: { fontSize: 14, fontWeight: '600', color: '#374151' },
-  payTotalValue: { fontSize: 24, fontWeight: '800' },
-  payLabel:      { fontSize: 13, fontWeight: '600', color: '#374151' },
-  payInput: {
-    borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 10,
-    padding: 12, fontSize: 16, backgroundColor: '#f8fafc', color: '#0f172a',
-  },
-  methodsRow:    { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  payRow: {
-    backgroundColor: '#f8fafc', borderRadius: 10, padding: 12,
-    borderWidth: 1, borderColor: '#e2e8f0',
-  },
-  removePayBtn: { padding: 6 },
-  addPayBtn: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
-    borderWidth: 1, borderStyle: 'dashed', borderRadius: 10, paddingVertical: 10,
-  },
-  addPayBtnText: { fontSize: 13, fontWeight: '600' },
-  methodChip: {
-    paddingHorizontal: 14, paddingVertical: 8, borderRadius: 8,
-    borderWidth: 1, borderColor: '#e2e8f0', backgroundColor: '#f9fafb',
-  },
-  methodChipText:{ fontSize: 13, fontWeight: '600', color: '#374151' },
-  changeBox: {
-    borderRadius: 10, padding: 12,
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-  },
-  changePos:   { backgroundColor: '#ecfdf5' },
-  changeNeg:   { backgroundColor: '#fef2f2' },
-  changeLabel: { fontSize: 13, fontWeight: '600', color: '#374151' },
-  changeValue: { fontSize: 18, fontWeight: '800', color: '#0f172a' },
-  confirmBtn:  { borderRadius: 12, padding: 16, alignItems: 'center', marginTop: 8 },
-  confirmBtnText: { color: '#fff', fontWeight: '700', fontSize: 15 },
-
-  detailItemCancelled: { opacity: 0.6 },
-  cancelledTag: { fontSize: 11, color: '#ef4444', fontWeight: '600', marginTop: 2 },
-  itemCancelBtn: { padding: 2 },
-})
+    tabBar:    { backgroundColor: c.surface, borderBottomWidth: 1, borderBottomColor: c.border },
+    tabContent:{ paddingHorizontal: 12, paddingVertical: 10, gap: 6, flexDirection: 'row', alignItems: 'center' },
+    tab:       { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, backgroundColor: c.surfaceAlt },
+    tabText:   { fontSize: 13, color: c.textMuted, fontWeight: '600' },
+  })
+}

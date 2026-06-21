@@ -9,6 +9,7 @@ import { Ionicons } from '@expo/vector-icons'
 import { api } from '@/lib/api'
 import { formatCurrency } from '@/lib/utils'
 import { useAuthStore } from '@/stores/auth-store'
+import { useAppColors } from '@/lib/theme'
 import { ErrorView } from '@/components/ErrorView'
 
 type Range = 'today' | '7d' | '30d'
@@ -54,16 +55,16 @@ interface InformeData {
 
 // ── Simple bar for relative values ───────────────────────────────────────────
 
-function Bar({ value, max, color }: { value: number; max: number; color: string }) {
+function Bar({ value, max, color, trackColor }: { value: number; max: number; color: string; trackColor: string }) {
   const pct = max > 0 ? (value / max) * 100 : 0
   return (
-    <View style={bar.track}>
+    <View style={[bar.track, { backgroundColor: trackColor }]}>
       <View style={[bar.fill, { width: `${pct}%` as any, backgroundColor: color }]} />
     </View>
   )
 }
 const bar = StyleSheet.create({
-  track: { height: 6, backgroundColor: '#f1f5f9', borderRadius: 3, overflow: 'hidden', flex: 1 },
+  track: { height: 6, borderRadius: 3, overflow: 'hidden', flex: 1 },
   fill:  { height: 6, borderRadius: 3 },
 })
 
@@ -76,6 +77,8 @@ export default function InformesScreen() {
   const { tenant, user } = useAuthStore()
   const PRIMARY  = tenant?.primaryColor ?? '#2563eb'
   const sign     = tenant?.currencySign ?? '$'
+  const c = useAppColors()
+  const s = makeStyles(c)
 
   useEffect(() => {
     if (user && !['admin', 'cajero'].includes(user.role)) router.back()
@@ -155,7 +158,7 @@ export default function InformesScreen() {
                 {new Date(pt.date + 'T00:00:00').toLocaleDateString('es-CO', { day: '2-digit', month: 'short' })}
               </Text>
               <View style={{ flex: 1 }}>
-                <Bar value={pt.sales} max={maxDay} color={PRIMARY} />
+                <Bar value={pt.sales} max={maxDay} color={PRIMARY} trackColor={c.surfaceAlt} />
               </View>
               <Text style={s.dayValue}>{fmt(pt.sales)}</Text>
             </View>
@@ -167,15 +170,15 @@ export default function InformesScreen() {
       {d && (d.byCategory?.length ?? 0) > 0 && (
         <View style={s.section}>
           <Text style={s.sectionTitle}>Ventas por categoría</Text>
-          {d.byCategory.map((c, i) => (
-            <View key={c.name} style={s.catRow}>
-              <Text style={s.catEmoji}>{c.emoji ?? '📦'}</Text>
+          {d.byCategory.map((cat, i) => (
+            <View key={cat.name} style={s.catRow}>
+              <Text style={s.catEmoji}>{cat.emoji ?? '📦'}</Text>
               <View style={{ flex: 1, gap: 4 }}>
                 <View style={s.catMeta}>
-                  <Text style={s.catName} numberOfLines={1}>{c.name}</Text>
-                  <Text style={s.catSub}>{c.qty} uds · {fmt(c.revenue)}</Text>
+                  <Text style={s.catName} numberOfLines={1}>{cat.name}</Text>
+                  <Text style={s.catSub}>{cat.qty} uds · {fmt(cat.revenue)}</Text>
                 </View>
-                <Bar value={c.revenue} max={maxCatRev} color={COLORS[i % COLORS.length]} />
+                <Bar value={cat.revenue} max={maxCatRev} color={COLORS[i % COLORS.length]} trackColor={c.surfaceAlt} />
               </View>
             </View>
           ))}
@@ -204,7 +207,7 @@ export default function InformesScreen() {
             <View key={key} style={s.methodRow}>
               <Ionicons
                 name={key === 'table' ? 'restaurant-outline' : key === 'delivery' ? 'bicycle-outline' : 'cafe-outline'}
-                size={14} color="#94a3b8"
+                size={14} color={c.textMuted}
               />
               <Text style={s.methodLabel}>
                 {key === 'table' ? 'Mesa' : key === 'bar' ? 'Barra' : 'Domicilio'}
@@ -227,7 +230,7 @@ export default function InformesScreen() {
                   <Text style={s.catName} numberOfLines={1}>{p.name}</Text>
                   <Text style={s.catSub}>{p.qty} uds · {fmt(p.revenue)}</Text>
                 </View>
-                <Bar value={p.qty} max={maxSales} color={PRIMARY} />
+                <Bar value={p.qty} max={maxSales} color={PRIMARY} trackColor={c.surfaceAlt} />
               </View>
             </View>
           ))}
@@ -255,7 +258,7 @@ export default function InformesScreen() {
 
       {d?.kpis.totalOrders === 0 && (
         <View style={s.empty}>
-          <Ionicons name="bar-chart-outline" size={48} color="#d1d5db" />
+          <Ionicons name="bar-chart-outline" size={48} color={c.border} />
           <Text style={s.emptyText}>Sin ventas en este período</Text>
         </View>
       )}
@@ -265,60 +268,62 @@ export default function InformesScreen() {
 
 // ─── Estilos ──────────────────────────────────────────────────────────────────
 
-const s = StyleSheet.create({
-  root:    { flex: 1, backgroundColor: '#f8fafc' },
-  centered:{ flex: 1, alignItems: 'center', justifyContent: 'center' },
-  scroll:  { padding: 16, gap: 14, paddingBottom: 40 },
+function makeStyles(c: ReturnType<typeof import('@/lib/theme').useAppColors>) {
+  return StyleSheet.create({
+    root:    { flex: 1, backgroundColor: c.background },
+    centered:{ flex: 1, alignItems: 'center', justifyContent: 'center' },
+    scroll:  { padding: 16, gap: 14, paddingBottom: 40 },
 
-  rangeRow: { flexDirection: 'row', gap: 8 },
-  rangeBtn: {
-    flex: 1, paddingVertical: 10, borderRadius: 10, alignItems: 'center',
-    backgroundColor: '#fff', borderWidth: 1, borderColor: '#e2e8f0',
-  },
-  rangeBtnText:      { fontSize: 14, fontWeight: '600', color: '#64748b' },
-  rangeBtnTextActive:{ color: '#fff' },
+    rangeRow: { flexDirection: 'row', gap: 8 },
+    rangeBtn: {
+      flex: 1, paddingVertical: 10, borderRadius: 10, alignItems: 'center',
+      backgroundColor: c.surface, borderWidth: 1, borderColor: c.border,
+    },
+    rangeBtnText:      { fontSize: 14, fontWeight: '600', color: c.textMuted },
+    rangeBtnTextActive:{ color: c.textInverse },
 
-  kpiRow: { flexDirection: 'row', gap: 12 },
-  kpi: {
-    flex: 1, backgroundColor: '#fff', borderRadius: 14, padding: 16, gap: 6,
-    shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 6, elevation: 2,
-  },
-  kpiIcon:  { width: 40, height: 40, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  kpiValue: { fontSize: 20, fontWeight: '800', color: '#0f172a' },
-  kpiLabel: { fontSize: 12, color: '#94a3b8', fontWeight: '500' },
+    kpiRow: { flexDirection: 'row', gap: 12 },
+    kpi: {
+      flex: 1, backgroundColor: c.surface, borderRadius: 14, padding: 16, gap: 6,
+      shadowColor: c.shadow, shadowOpacity: 0.04, shadowRadius: 6, elevation: 2,
+    },
+    kpiIcon:  { width: 40, height: 40, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+    kpiValue: { fontSize: 20, fontWeight: '800', color: c.text },
+    kpiLabel: { fontSize: 12, color: c.textMuted, fontWeight: '500' },
 
-  section: {
-    backgroundColor: '#fff', borderRadius: 14, padding: 16, gap: 10,
-    shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 6, elevation: 2,
-  },
-  sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  sectionTitle:  { fontSize: 11, fontWeight: '700', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: 0.5 },
-  sectionNote:   { fontSize: 12, color: '#94a3b8', marginTop: -6 },
+    section: {
+      backgroundColor: c.surface, borderRadius: 14, padding: 16, gap: 10,
+      shadowColor: c.shadow, shadowOpacity: 0.04, shadowRadius: 6, elevation: 2,
+    },
+    sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+    sectionTitle:  { fontSize: 11, fontWeight: '700', color: c.textMuted, textTransform: 'uppercase', letterSpacing: 0.5 },
+    sectionNote:   { fontSize: 12, color: c.textMuted, marginTop: -6 },
 
-  dayRow:   { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 2 },
-  dayLabel: { fontSize: 12, color: '#64748b', width: 52 },
-  dayValue: { fontSize: 12, fontWeight: '700', color: '#0f172a', width: 80, textAlign: 'right' },
+    dayRow:   { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 2 },
+    dayLabel: { fontSize: 12, color: c.textMuted, width: 52 },
+    dayValue: { fontSize: 12, fontWeight: '700', color: c.text, width: 80, textAlign: 'right' },
 
-  catRow:   { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 2 },
-  catEmoji: { fontSize: 18, width: 26, textAlign: 'center' },
-  catMeta:  { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  catName:  { fontSize: 13, fontWeight: '600', color: '#1e293b', flex: 1 },
-  catSub:   { fontSize: 12, color: '#94a3b8', flexShrink: 0 },
+    catRow:   { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 2 },
+    catEmoji: { fontSize: 18, width: 26, textAlign: 'center' },
+    catMeta:  { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+    catName:  { fontSize: 13, fontWeight: '600', color: c.text, flex: 1 },
+    catSub:   { fontSize: 12, color: c.textMuted, flexShrink: 0 },
 
-  methodRow:   { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 3 },
-  dot:         { width: 8, height: 8, borderRadius: 4 },
-  methodLabel: { flex: 1, fontSize: 14, color: '#374151' },
-  methodValue: { fontSize: 14, fontWeight: '700', color: '#0f172a' },
+    methodRow:   { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 3 },
+    dot:         { width: 8, height: 8, borderRadius: 4 },
+    methodLabel: { flex: 1, fontSize: 14, color: c.textSecondary },
+    methodValue: { fontSize: 14, fontWeight: '700', color: c.text },
 
-  topRow:  { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 2 },
-  rankNum: { fontSize: 13, fontWeight: '700', color: '#94a3b8', width: 20, textAlign: 'right' },
+    topRow:  { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 2 },
+    rankNum: { fontSize: 13, fontWeight: '700', color: c.textMuted, width: 20, textAlign: 'right' },
 
-  lowRow:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 4, borderTopWidth: 1, borderTopColor: '#f8fafc' },
-  lowName:    { fontSize: 13, color: '#374151', flex: 1 },
-  lowQty:     { fontSize: 13, fontWeight: '700', marginLeft: 8 },
-  lowQtyZero: { color: '#ef4444' },
-  lowQtyLow:  { color: '#f59e0b' },
+    lowRow:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 4, borderTopWidth: 1, borderTopColor: c.background },
+    lowName:    { fontSize: 13, color: c.textSecondary, flex: 1 },
+    lowQty:     { fontSize: 13, fontWeight: '700', marginLeft: 8 },
+    lowQtyZero: { color: c.danger },
+    lowQtyLow:  { color: '#f59e0b' },
 
-  empty:     { alignItems: 'center', justifyContent: 'center', padding: 40, gap: 12 },
-  emptyText: { color: '#9ca3af', fontSize: 14 },
-})
+    empty:     { alignItems: 'center', justifyContent: 'center', padding: 40, gap: 12 },
+    emptyText: { color: c.textMuted, fontSize: 14 },
+  })
+}
