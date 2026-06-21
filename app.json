@@ -3,15 +3,27 @@
     "name": "CafeteriaOS",
     "slug": "cafeteria-mobile",
     "version": "1.0.0",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
-    "assetBundlePatterns": ["**/*"],
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "jsEngine": "hermes",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.cafeteriaos.mobile"
+      "bundleIdentifier": "com.cafeteriaos.mobile",
+      "buildNumber": "1"
     },
     "android": {
-      "package": "com.cafeteriaos.mobile"
+      "package": "com.cafeteriaos.mobile",
+      "versionCode": 1,
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#2563eb"
+      }
     },
     "plugins": [
       "expo-router",
@@ -20,6 +32,18 @@
     "scheme": "cafeteriaos",
     "experiments": {
       "typedRoutes": true
-    }
+    },
+    "updates": {
+      "enabled": true,
+      "fallbackToCacheTimeout": 0,
+      "url": "https://u.expo.dev/d71257df-b802-4ebe-9744-7bfd82555fd1"
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "d71257df-b802-4ebe-9744-7bfd82555fd1"
+      }
+    },
+    "owner": "amolina429"
   }
 }

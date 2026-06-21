@@ -9,6 +9,7 @@ import { formatDateTime } from '@/lib/utils'
 import { useAuthStore } from '@/stores/auth-store'
 import { enqueueSync } from '@/lib/offline/sync-queue'
 import { useNetworkStatus } from '@/hooks/use-network'
+import { ErrorView } from '@/components/ErrorView'
 import type { Order } from '@/types'
 
 // ─── Tarjeta de pedido ────────────────────────────────────────────────────────
@@ -118,7 +119,7 @@ export default function CocinaScreen() {
   const { tenant } = useAuthStore()
   const PRIMARY = tenant?.primaryColor ?? '#2563eb'
 
-  const { data, isLoading, isRefetching, refetch } = useQuery({
+  const { data, isLoading, isError, isRefetching, refetch } = useQuery({
     queryKey: ['kitchen'],
     queryFn: () => api.get<{ data: Order[] }>('/api/tenant/kitchen').then((r) => r.data ?? []),
     refetchInterval: 5_000,
@@ -137,6 +138,10 @@ export default function CocinaScreen() {
 
   if (isLoading) {
     return <View style={styles.centered}><ActivityIndicator size="large" color={PRIMARY} /></View>
+  }
+
+  if (isError) {
+    return <ErrorView message="No se pudieron cargar los pedidos de cocina." onRetry={refetch} />
   }
 
   return (

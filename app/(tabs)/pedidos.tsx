@@ -11,6 +11,7 @@ import { formatCurrency, formatDateTime } from '@/lib/utils'
 import { useAuthStore } from '@/stores/auth-store'
 import { enqueueSync } from '@/lib/offline/sync-queue'
 import { useNetworkStatus } from '@/hooks/use-network'
+import { ErrorView } from '@/components/ErrorView'
 import { ORDER_STATUS_LABELS, ORDER_STATUS_COLORS, ORDER_TYPE_LABELS } from '@/types'
 import type { Order, OrderStatus } from '@/types'
 
@@ -593,6 +594,7 @@ export default function PedidosScreen() {
   const historialOrders = historialQuery.data ?? []
 
   const isLoading    = mode === 'active' ? activeQuery.isLoading : historialQuery.isLoading
+  const isError      = mode === 'active' ? activeQuery.isError : historialQuery.isError
   const isRefetching = mode === 'active' ? activeQuery.isRefetching : historialQuery.isRefetching
   const refetch      = mode === 'active' ? activeQuery.refetch : historialQuery.refetch
 
@@ -676,6 +678,8 @@ export default function PedidosScreen() {
 
       {isLoading
         ? <View style={styles.centered}><ActivityIndicator size="large" color={PRIMARY} /></View>
+        : isError
+        ? <ErrorView message="No se pudieron cargar los pedidos." onRetry={refetch} />
         : (
           <FlatList
             data={filtered}

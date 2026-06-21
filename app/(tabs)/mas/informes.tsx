@@ -9,6 +9,7 @@ import { Ionicons } from '@expo/vector-icons'
 import { api } from '@/lib/api'
 import { formatCurrency } from '@/lib/utils'
 import { useAuthStore } from '@/stores/auth-store'
+import { ErrorView } from '@/components/ErrorView'
 
 type Range = 'today' | '7d' | '30d'
 
@@ -83,7 +84,7 @@ export default function InformesScreen() {
   const [range, setRange] = useState<Range>('today')
   const { from, to } = getFromTo(range)
 
-  const { data, isLoading, isRefetching, refetch } = useQuery({
+  const { data, isLoading, isError, isRefetching, refetch } = useQuery({
     queryKey: ['informes', range],
     queryFn:  () =>
       api.get<{ data: InformeData }>(`/api/tenant/informes?from=${from}&to=${to}`)
@@ -92,6 +93,10 @@ export default function InformesScreen() {
 
   if (isLoading) {
     return <View style={s.centered}><ActivityIndicator size="large" color={PRIMARY} /></View>
+  }
+
+  if (isError) {
+    return <ErrorView message="No se pudo cargar el informe." onRetry={refetch} />
   }
 
   const d = data

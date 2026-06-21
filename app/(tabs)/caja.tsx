@@ -11,6 +11,7 @@ import { api } from '@/lib/api'
 import { formatCurrency, formatDateTime } from '@/lib/utils'
 import { useAuthStore } from '@/stores/auth-store'
 import { useNetworkStatus } from '@/hooks/use-network'
+import { ErrorView } from '@/components/ErrorView'
 import type { CashRegister, CajaSummary } from '@/types'
 
 const GREEN = '#10b981'
@@ -237,7 +238,7 @@ export default function CajaScreen() {
   const [openModal, setOpenModal]   = useState(false)
   const [closeModal, setCloseModal] = useState(false)
 
-  const { data, isLoading, isRefetching, refetch } = useQuery({
+  const { data, isLoading, isError, isRefetching, refetch } = useQuery({
     queryKey: ['caja'],
     queryFn: () => api.get<{ data: CajaData }>('/api/tenant/caja').then((r) => r.data),
     refetchInterval: 30_000,
@@ -251,6 +252,10 @@ export default function CajaScreen() {
 
   if (isLoading) {
     return <View style={styles.centered}><ActivityIndicator size="large" color={PRIMARY} /></View>
+  }
+
+  if (isError) {
+    return <ErrorView message="No se pudo cargar el estado de la caja." onRetry={refetch} />
   }
 
   const sign    = data?.currencySign ?? '$'

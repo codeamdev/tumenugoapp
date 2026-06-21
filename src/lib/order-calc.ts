@@ -56,7 +56,11 @@ export function calcItemTotal(item: CalcItem): number {
 export function calcOrderTotals(
   items: CalcItem[],
   products: ProductForCalc[],
-  options: { couponDiscount?: number; tipPercent?: number; deliveryFee?: number } = {}
+  options: {
+    couponDiscount?: number
+    tipPercent?: number
+    deliveryFee?: number
+  } = {}
 ): OrderTotals {
   const { couponDiscount = 0, tipPercent = 0, deliveryFee = 0 } = options
   const taxMap = new Map<string, TaxLine>()
@@ -89,7 +93,13 @@ export function calcOrderTotals(
   const taxTotal = round2(taxLines.reduce((s, l) => s + l.amount, 0))
   const discount = round2(couponDiscount)
   const tip = round2(subtotal * (tipPercent / 100))
-  const total = round2(subtotal + taxTotal - discount + tip + deliveryFee)
+  const total = round2(
+    subtotal + taxTotal - discount + tip + deliveryFee
+  )
 
   return { subtotal, discount, taxLines, taxTotal, tip, deliveryFee, total }
+}
+
+export function calcChange(received: number, total: number): number {
+  return round2(received - total)
 }

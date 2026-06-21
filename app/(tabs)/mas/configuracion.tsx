@@ -9,6 +9,7 @@ import { Ionicons } from '@expo/vector-icons'
 import { api } from '@/lib/api'
 import { useAuthStore } from '@/stores/auth-store'
 import { useNetworkStatus } from '@/hooks/use-network'
+import { ErrorView } from '@/components/ErrorView'
 
 const PRESET_COLORS = ['#2563eb', '#16a34a', '#dc2626', '#9333ea', '#ea580c', '#0891b2', '#be185d', '#d97706']
 
@@ -39,7 +40,7 @@ export default function ConfiguracionScreen() {
     if (user.role !== 'admin') router.replace('/mas' as any)
   }, [user?.id])
 
-  const { data: configData, isLoading } = useQuery({
+  const { data: configData, isLoading, isError, refetch } = useQuery({
     queryKey: ['configuracion'],
     queryFn: () => api.get<{ data: RemoteConfig }>('/api/tenant/configuracion').then((r) => r.data),
     gcTime: 24 * 60 * 60 * 1000,
@@ -86,6 +87,10 @@ export default function ConfiguracionScreen() {
         <ActivityIndicator style={{ flex: 1 }} size="large" color={PRIMARY} />
       </SafeAreaView>
     )
+  }
+
+  if (isError) {
+    return <ErrorView message="No se pudo cargar la configuración." onRetry={refetch} />
   }
 
   return (

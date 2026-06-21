@@ -12,6 +12,7 @@ import { useAuthStore } from '@/stores/auth-store'
 import { formatCurrency } from '@/lib/utils'
 import { enqueueSync, saveOfflineOrder } from '@/lib/offline/sync-queue'
 import { useNetworkStatus } from '@/hooks/use-network'
+import { ErrorView } from '@/components/ErrorView'
 import type { Product, Category, Table, ModifierGroup, CartModifier } from '@/types'
 
 // ─── Hooks de datos ───────────────────────────────────────────────────────────
@@ -560,7 +561,7 @@ function CartModal({ visible, onClose, tables }: {
 // ─── Pantalla principal POS ───────────────────────────────────────────────────
 
 export default function PosScreen() {
-  const { data: _products, isLoading: loadingProds } = useProducts()
+  const { data: _products, isLoading: loadingProds, isError: errorProds, refetch: refetchProds } = useProducts()
   const { data: _categories } = useCategories()
   const { data: _tables }     = useTables()
   const products   = Array.isArray(_products)   ? _products   : []
@@ -598,6 +599,10 @@ export default function PosScreen() {
 
   if (loadingProds) {
     return <View style={styles.centered}><ActivityIndicator size="large" color={PRIMARY} /></View>
+  }
+
+  if (errorProds) {
+    return <ErrorView message="No se pudieron cargar los productos." onRetry={refetchProds} />
   }
 
   return (

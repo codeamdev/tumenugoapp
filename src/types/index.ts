@@ -31,7 +31,7 @@ export interface TenantConfig {
 // Backend uses 'table' | 'bar' | 'delivery'
 export type OrderType = 'table' | 'bar' | 'delivery'
 export type OrderStatus = 'new' | 'sent' | 'preparing' | 'ready' | 'delivered' | 'closed' | 'cancelled'
-export type PaymentMethod = 'cash' | 'card' | 'transfer' | 'nequi' | 'daviplata' | 'other'
+export type PaymentMethod = 'cash' | 'card' | 'transfer' | 'nequi' | 'daviplata' | 'other' | 'fiado'
 
 export interface OrderItem {
   id: string
@@ -189,4 +189,15 @@ export const ORDER_TYPE_LABELS: Record<OrderType, string> = {
   table: 'Mesa',
   bar: 'Barra',
   delivery: 'Domicilio',
+}
+
+// Record<PaymentMethod,string> forces exhaustiveness: add a key here whenever the union grows.
+export const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {
+  cash:       'Efectivo',
+  card:       'Tarjeta',
+  transfer:   'Transferencia',
+  nequi:      'Nequi',
+  daviplata:  'Daviplata',
+  other:      'Otro',
+  fiado:      'Pendiente de pago',
 }

@@ -1,6 +1,7 @@
 import { create } from 'zustand'
-import { saveToken, saveRefreshToken, saveSession, clearSession, getToken, getSavedUser, getSavedTenant, getSavedConfig } from '@/lib/auth'
+import { saveToken, saveRefreshToken, saveSession, clearSession, getToken, getRefreshToken, getSavedUser, getSavedTenant, getSavedConfig } from '@/lib/auth'
 import { api } from '@/lib/api'
+import { TENANT_URL } from '@/lib/config'
 import type { AuthUser, AuthTenant, TenantConfig } from '@/types'
 
 interface AuthState {
@@ -59,6 +60,23 @@ export const useAuthStore = create<AuthState>((set) => ({
   },
 
   logout: async () => {
+    // Revoke the refresh token on the server before clearing local session.
+    // If the request fails (network down, token already expired), we still
+    // clear locally so the user is not stuck in a broken auth state.
+    try {
+      const refreshToken = await getRefreshToken()
+      if (refreshToken) {
+        await fetch(`${TENANT_URL}/api/auth/logout`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${refreshToken}`,
+          },
+        })
+      }
+    } catch {
+      // Network error or token already invalid — proceed with local clear
+    }
     await clearSession()
     set({ user: null, tenant: null, config: null, isAuthenticated: false })
   },
