@@ -7,7 +7,8 @@
       "developmentClient": true,
       "distribution": "internal",
       "env": {
-        "EXPO_PUBLIC_TENANT_URL": "http://localhost:3000"
+        "EXPO_PUBLIC_TENANT_URL": "http://localhost:3000",
+        "EXPO_PUBLIC_TENANT_SLUG": "coffeegarden"
       }
     },
     "preview": {
@@ -16,7 +17,8 @@
         "buildType": "apk"
       },
       "env": {
-        "EXPO_PUBLIC_TENANT_URL": "https://api.ornatusilustracion.com"
+        "EXPO_PUBLIC_TENANT_URL": "https://coffeegarden.ornatusilustracion.com",
+        "EXPO_PUBLIC_TENANT_SLUG": "coffeegarden"
       }
     },
     "production": {
@@ -25,7 +27,8 @@
         "buildType": "app-bundle"
       },
       "env": {
-        "EXPO_PUBLIC_TENANT_URL": "https://api.ornatusilustracion.com"
+        "EXPO_PUBLIC_TENANT_URL": "https://coffeegarden.ornatusilustracion.com",
+        "EXPO_PUBLIC_TENANT_SLUG": "coffeegarden"
       }
     }
   },
