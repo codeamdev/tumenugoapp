@@ -11,10 +11,16 @@ export function OfflineBanner() {
   const [pending, setPending] = useState(0)
 
   useEffect(() => {
-    setPending(getPendingCount())
-    // Poll while offline OR while connected and still draining the queue
-    const interval = setInterval(() => setPending(getPendingCount()), 3000)
-    return () => clearInterval(interval)
+    let id: ReturnType<typeof setInterval>
+    const tick = () => {
+      const n = getPendingCount()
+      setPending(n)
+      // Self-stop when back online and queue empty
+      if (isConnected && n === 0) clearInterval(id)
+    }
+    tick()
+    id = setInterval(tick, 3000)
+    return () => clearInterval(id)
   }, [isConnected])
 
   if (isConnected && pending === 0) return null

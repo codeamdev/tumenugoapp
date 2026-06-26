@@ -43,6 +43,8 @@ export default function ConfiguracionScreen() {
     if (user.role !== 'admin') router.replace('/mas' as any)
   }, [user?.id])
 
+  if (user && user.role !== 'admin') return null
+
   const { data: configData, isLoading, isError, refetch } = useQuery({
     queryKey: ['configuracion'],
     queryFn: () => api.get<{ data: RemoteConfig }>('/api/tenant/configuracion').then((r) => r.data),

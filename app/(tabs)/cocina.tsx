@@ -128,6 +128,7 @@ export default function CocinaScreen() {
     queryKey: ['kitchen'],
     queryFn: () => api.get<{ data: Order[] }>('/api/tenant/kitchen').then((r) => r.data ?? []),
     refetchInterval: 5_000,
+    refetchIntervalInBackground: false,
   })
 
   const orders   = data ?? []

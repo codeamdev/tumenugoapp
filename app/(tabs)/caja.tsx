@@ -250,6 +250,9 @@ export default function CajaScreen() {
     if (user && !['admin', 'cajero'].includes(user.role)) router.back()
   }, [user?.role])
 
+  // Early null prevents brief flash of content before useEffect redirect fires
+  if (user && !['admin', 'cajero'].includes(user.role)) return null
+
   const [openModal, setOpenModal]   = useState(false)
   const [closeModal, setCloseModal] = useState(false)
 
@@ -257,6 +260,7 @@ export default function CajaScreen() {
     queryKey: ['caja'],
     queryFn: () => api.get<{ data: CajaData }>('/api/tenant/caja').then((r) => r.data),
     refetchInterval: 30_000,
+    refetchIntervalInBackground: false,
     gcTime: 24 * 60 * 60 * 1000,
   })
 

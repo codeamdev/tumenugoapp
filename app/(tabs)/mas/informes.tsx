@@ -84,6 +84,8 @@ export default function InformesScreen() {
     if (user && !['admin', 'cajero'].includes(user.role)) router.back()
   }, [user?.role])
 
+  if (user && !['admin', 'cajero'].includes(user.role)) return null
+
   const [range, setRange] = useState<Range>('today')
   const { from, to } = getFromTo(range)
 

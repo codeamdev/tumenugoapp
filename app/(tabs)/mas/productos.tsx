@@ -6,6 +6,8 @@ import { Ionicons } from '@expo/vector-icons'
 import { api } from '@/lib/api'
 import { formatCurrency } from '@/lib/utils'
 import { useAuthStore } from '@/stores/auth-store'
+import { useNetworkStatus } from '@/hooks/use-network'
+import { enqueueSync } from '@/lib/offline/sync-queue'
 import { useAppColors } from '@/lib/theme'
 import type { Product, Category } from '@/types'
 
@@ -18,13 +20,20 @@ function ProductRow({ product, categories, primary, sign, onToggle, c }: {
   c: ReturnType<typeof import('@/lib/theme').useAppColors>
 }) {
   const cat = categories.find((cat) => cat.id === product.categoryId)
+  const { isConnected } = useNetworkStatus()
 
   async function toggle(value: boolean) {
     try {
       await api.patch(`/api/tenant/products/${product.id}`, { isAvailable: value })
       onToggle()
     } catch (err: any) {
-      Alert.alert('Error', err.message)
+      const isNetErr = !isConnected || err?.message?.includes('Network request failed')
+      if (isNetErr) {
+        enqueueSync('toggle_product', { productId: product.id, isAvailable: value })
+        Alert.alert('Sin conexión', 'El cambio se sincronizará al reconectar.')
+      } else {
+        Alert.alert('Error', err.message)
+      }
     }
   }
 
@@ -65,6 +74,9 @@ export default function ProductosScreen() {
   useEffect(() => {
     if (user && !['admin', 'cajero'].includes(user.role)) router.back()
   }, [user?.role])
+
+  if (user && !['admin', 'cajero'].includes(user.role)) return null
+
   const sign    = tenant?.currencySign ?? '$'
 
   const { data, isLoading, isRefetching, refetch } = useQuery({

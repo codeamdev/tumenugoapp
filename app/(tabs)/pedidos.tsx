@@ -693,6 +693,7 @@ export default function PedidosScreen() {
     queryKey: ['orders', 'active'],
     queryFn: () => api.get<{ data: Order[] }>('/api/tenant/orders').then((r) => r.data ?? []),
     refetchInterval: 15_000,
+    refetchIntervalInBackground: false,
     enabled: mode === 'active',
   })
 
