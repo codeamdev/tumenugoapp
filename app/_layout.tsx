@@ -20,9 +20,15 @@ setupOnlineManager()
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
+      // offlineFirst: queries run from cache regardless of network state.
+      // When offline, failed fetches don't set isError if cached data exists.
+      networkMode: 'offlineFirst',
       retry: 1,
       staleTime: 30_000,
       gcTime: 24 * 60 * 60 * 1000, // keep cache 24h for offline use
+    },
+    mutations: {
+      networkMode: 'offlineFirst',
     },
   },
 })
