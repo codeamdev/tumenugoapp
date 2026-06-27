@@ -21,6 +21,7 @@ async function attemptTokenRefresh(): Promise<void> {
 
   const response = await fetch(`${TENANT_URL}/api/auth/refresh`, {
     method: 'POST',
+    redirect: 'manual',
     headers: {
       'Content-Type': 'application/json',
       'Authorization': `Bearer ${refreshToken}`,
@@ -54,7 +55,10 @@ async function request<T>(
   if (slug) headers['x-tenant-slug'] = slug
   if (token) headers['Authorization'] = `Bearer ${token}`
 
-  const response = await fetch(`${TENANT_URL}${path}`, { ...options, headers })
+  // redirect: 'manual' prevents fetch from auto-following 307 redirects
+  // (Next.js returns 307 to /login when session is expired; auto-follow
+  //  would return HTML that fails JSON.parse with "Unexpected character: <")
+  const response = await fetch(`${TENANT_URL}${path}`, { ...options, headers, redirect: 'manual' })
 
   // 401: try a token refresh once, then retry the original request
   if ((response.status === 401 || response.status === 307) && !isRetry) {
