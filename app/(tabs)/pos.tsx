@@ -746,10 +746,9 @@ export default function PosScreen() {
   const [modProduct, setModProduct]           = useState<Product | null>(null)
 
   // Limpia el buscador y lo enfoca tras agregar un producto
-  // 150ms: Android necesita más tiempo que iOS para aceptar focus después de un tap
   function focusSearch() {
     setSearch('')
-    setTimeout(() => searchRef.current?.focus(), 150)
+    requestAnimationFrame(() => searchRef.current?.focus())
   }
 
   const filtered = useMemo(() => {
@@ -764,9 +763,7 @@ export default function PosScreen() {
       setModProduct(product)
     } else {
       addItem({ productId: product.id, name: product.name, unitPrice: parseFloat(product.price), quantity: 1, modifiers: [], notes: '' })
-      // Inline: setSearch y searchRef son estables, no necesitan estar en deps
-      setSearch('')
-      setTimeout(() => searchRef.current?.focus(), 150)
+      focusSearch()
     }
   }, [addItem])
 
