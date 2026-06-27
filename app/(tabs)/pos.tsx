@@ -2,7 +2,7 @@ import { useState, useMemo, useCallback } from 'react'
 import {
   View, Text, FlatList, TouchableOpacity, StyleSheet,
   TextInput, Modal, ScrollView, Alert, ActivityIndicator,
-  SafeAreaView, KeyboardAvoidingView, Platform,
+  SafeAreaView, KeyboardAvoidingView, Platform, RefreshControl,
 } from 'react-native'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Ionicons } from '@expo/vector-icons'
@@ -715,9 +715,13 @@ function makeCartStyles(c: ReturnType<typeof useAppColors>) {
 export default function PosScreen() {
   const c = useAppColors()
   const s = makePosStyles(c)
-  const { data: _products, isLoading: loadingProds, isError: errorProds, refetch: refetchProds } = useProducts()
-  const { data: _categories } = useCategories()
-  const { data: _tables }     = useTables()
+  const { data: _products, isLoading: loadingProds, isError: errorProds, isRefetching: refetchingProds, refetch: refetchProds } = useProducts()
+  const { data: _categories, refetch: refetchCats } = useCategories()
+  const { data: _tables, refetch: refetchTables }   = useTables()
+
+  async function handleRefresh() {
+    await Promise.all([refetchProds(), refetchCats(), refetchTables()])
+  }
   const products   = Array.isArray(_products)   ? _products   : []
   const categories = Array.isArray(_categories) ? _categories : []
   const tables     = Array.isArray(_tables)     ? _tables     : []
@@ -771,11 +775,21 @@ export default function PosScreen() {
           value={search}
           onChangeText={setSearch}
         />
-        {search.length > 0 && (
-          <TouchableOpacity onPress={() => setSearch('')}>
-            <Ionicons name="close-circle" size={18} color={c.textMuted} />
-          </TouchableOpacity>
-        )}
+        {search.length > 0
+          ? (
+            <TouchableOpacity onPress={() => setSearch('')}>
+              <Ionicons name="close-circle" size={18} color={c.textMuted} />
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity onPress={handleRefresh} style={{ padding: 2 }}>
+              <Ionicons
+                name={refetchingProds ? 'sync' : 'refresh-outline'}
+                size={18}
+                color={refetchingProds ? PRIMARY : c.textMuted}
+              />
+            </TouchableOpacity>
+          )
+        }
       </View>
 
       {/* Categorías */}
@@ -809,6 +823,14 @@ export default function PosScreen() {
         numColumns={2}
         renderItem={({ item }) => <ProductCard product={item} onPress={() => handlePress(item)} />}
         contentContainerStyle={s.grid}
+        refreshControl={
+          <RefreshControl
+            refreshing={refetchingProds}
+            onRefresh={handleRefresh}
+            tintColor={PRIMARY}
+            colors={[PRIMARY]}
+          />
+        }
         ListEmptyComponent={
           <View style={s.centered}>
             <Ionicons name="fast-food-outline" size={48} color={c.border} />
