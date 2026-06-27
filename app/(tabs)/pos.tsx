@@ -745,10 +745,11 @@ export default function PosScreen() {
   const [freeOpen, setFreeOpen]               = useState(false)
   const [modProduct, setModProduct]           = useState<Product | null>(null)
 
-  // Limpia el buscador y lo enfoca para que el cajero pueda buscar el siguiente producto
+  // Limpia el buscador y lo enfoca tras agregar un producto
+  // 150ms: Android necesita más tiempo que iOS para aceptar focus después de un tap
   function focusSearch() {
     setSearch('')
-    setTimeout(() => searchRef.current?.focus(), 50)
+    setTimeout(() => searchRef.current?.focus(), 150)
   }
 
   const filtered = useMemo(() => {
@@ -763,7 +764,9 @@ export default function PosScreen() {
       setModProduct(product)
     } else {
       addItem({ productId: product.id, name: product.name, unitPrice: parseFloat(product.price), quantity: 1, modifiers: [], notes: '' })
-      focusSearch()
+      // Inline: setSearch y searchRef son estables, no necesitan estar en deps
+      setSearch('')
+      setTimeout(() => searchRef.current?.focus(), 150)
     }
   }, [addItem])
 
