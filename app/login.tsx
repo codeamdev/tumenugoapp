@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
   KeyboardAvoidingView, Platform, ScrollView, ActivityIndicator, Alert, Modal, FlatList,
@@ -8,22 +8,17 @@ import { useAuthStore } from '@/stores/auth-store'
 import { ApiError } from '@/lib/api'
 import { useAppColors } from '@/lib/theme'
 
-// ─── Selector de tenant (cuando un usuario pertenece a varios tenants) ────────
+// ─── Selector de tenant ───────────────────────────────────────────────────────
 
 interface TenantOption { id: string; name: string; slug: string }
 
-function TenantPicker({
-  tenants,
-  onSelect,
-  onCancel,
-}: {
+function TenantPicker({ tenants, onSelect, onCancel }: {
   tenants: TenantOption[]
   onSelect: (slug: string) => void
   onCancel: () => void
 }) {
   const c = useAppColors()
   const p = makeTenantPickerStyles(c)
-
   return (
     <Modal visible animationType="slide" presentationStyle="formSheet">
       <View style={p.root}>
@@ -75,14 +70,20 @@ export default function LoginScreen() {
   const { login } = useAuthStore()
   const c = useAppColors()
   const s = makeLoginStyles(c)
+  const passwordRef = useRef<TextInput>(null)
 
-  const [email,    setEmail]    = useState('')
-  const [password, setPassword] = useState('')
-  const [loading,  setLoading]  = useState(false)
+  const [email,         setEmail]         = useState('')
+  const [password,      setPassword]      = useState('')
+  const [loading,       setLoading]       = useState(false)
+  const [showPassword,  setShowPassword]  = useState(false)
+  const [emailFocused,  setEmailFocused]  = useState(false)
+  const [passFocused,   setPassFocused]   = useState(false)
 
-  // Multi-tenant picker state
   const [tenantOptions, setTenantOptions] = useState<TenantOption[] | null>(null)
   const [pendingCreds,  setPendingCreds]  = useState<{ email: string; password: string } | null>(null)
+
+  const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())
+  const canSubmit  = email.trim().length > 0 && password.length > 0 && !loading
 
   async function handleLogin(slugOverride?: string) {
     const trimEmail = email.trim().toLowerCase()
@@ -95,7 +96,6 @@ export default function LoginScreen() {
       await login({ email: trimEmail, password, tenantSlug: slugOverride })
     } catch (err) {
       if (err instanceof ApiError && err.status === 300) {
-        // Multiple tenants — show picker
         const body = (err as any).body as { tenants: TenantOption[] }
         if (body?.tenants?.length) {
           setPendingCreds({ email: trimEmail, password })
@@ -143,35 +143,75 @@ export default function LoginScreen() {
           </View>
 
           <View style={s.card}>
+            {/* Email */}
             <Text style={s.fieldLabel}>Correo electrónico</Text>
-            <TextInput
-              style={s.input}
-              placeholder="tu@correo.com"
-              placeholderTextColor={c.textMuted}
-              value={email}
-              onChangeText={setEmail}
-              autoCapitalize="none"
-              keyboardType="email-address"
-              returnKeyType="next"
-              autoComplete="email"
-            />
+            <View style={[s.inputWrap, emailFocused && s.inputWrapFocused]}>
+              <Ionicons
+                name="mail-outline"
+                size={18}
+                color={emailFocused ? '#2563eb' : c.textMuted}
+                style={s.inputIcon}
+              />
+              <TextInput
+                style={s.input}
+                placeholder="tu@correo.com"
+                placeholderTextColor={c.textMuted}
+                value={email}
+                onChangeText={setEmail}
+                autoCapitalize="none"
+                keyboardType="email-address"
+                returnKeyType="next"
+                autoComplete="email"
+                onFocus={() => setEmailFocused(true)}
+                onBlur={() => setEmailFocused(false)}
+                onSubmitEditing={() => passwordRef.current?.focus()}
+              />
+              {email.length > 0 && (
+                <Ionicons
+                  name={emailValid ? 'checkmark-circle' : 'alert-circle'}
+                  size={18}
+                  color={emailValid ? '#10b981' : c.textMuted}
+                />
+              )}
+            </View>
 
-            <Text style={[s.fieldLabel, { marginTop: 16 }]}>Contraseña</Text>
-            <TextInput
-              style={s.input}
-              placeholder="••••••••"
-              placeholderTextColor={c.textMuted}
-              value={password}
-              onChangeText={setPassword}
-              secureTextEntry
-              returnKeyType="done"
-              onSubmitEditing={() => handleLogin()}
-            />
+            {/* Contraseña */}
+            <Text style={[s.fieldLabel, { marginTop: 20 }]}>Contraseña</Text>
+            <View style={[s.inputWrap, passFocused && s.inputWrapFocused]}>
+              <Ionicons
+                name="lock-closed-outline"
+                size={18}
+                color={passFocused ? '#2563eb' : c.textMuted}
+                style={s.inputIcon}
+              />
+              <TextInput
+                ref={passwordRef}
+                style={s.input}
+                placeholder="••••••••"
+                placeholderTextColor={c.textMuted}
+                value={password}
+                onChangeText={setPassword}
+                secureTextEntry={!showPassword}
+                returnKeyType="done"
+                autoComplete="password"
+                onFocus={() => setPassFocused(true)}
+                onBlur={() => setPassFocused(false)}
+                onSubmitEditing={() => handleLogin()}
+              />
+              <TouchableOpacity onPress={() => setShowPassword((v) => !v)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                <Ionicons
+                  name={showPassword ? 'eye-off-outline' : 'eye-outline'}
+                  size={18}
+                  color={c.textMuted}
+                />
+              </TouchableOpacity>
+            </View>
 
+            {/* Botón */}
             <TouchableOpacity
-              style={[s.btn, loading && s.btnDisabled]}
+              style={[s.btn, !canSubmit && s.btnDisabled]}
               onPress={() => handleLogin()}
-              disabled={loading}
+              disabled={!canSubmit}
               activeOpacity={0.8}
             >
               {loading
@@ -214,13 +254,24 @@ function makeLoginStyles(c: ReturnType<typeof useAppColors>) {
       backgroundColor: c.surface, borderRadius: 16, padding: 24,
       shadowColor: c.shadow, shadowOpacity: 0.06, shadowRadius: 16, elevation: 4,
     },
-    fieldLabel: { fontSize: 13, fontWeight: '600', color: c.textSecondary, marginBottom: 6 },
-    input: {
-      borderWidth: 1, borderColor: c.border, borderRadius: 10,
-      padding: 12, fontSize: 15, color: c.text, backgroundColor: c.surfaceAlt,
+    fieldLabel: { fontSize: 13, fontWeight: '600', color: c.textSecondary, marginBottom: 8 },
+
+    inputWrap: {
+      flexDirection: 'row', alignItems: 'center',
+      borderWidth: 1.5, borderColor: c.border, borderRadius: 10,
+      backgroundColor: c.surfaceAlt, paddingHorizontal: 12, height: 50,
     },
-    btn:         { backgroundColor: '#2563eb', borderRadius: 10, padding: 15, alignItems: 'center', marginTop: 24 },
-    btnDisabled: { opacity: 0.6 },
+    inputWrapFocused: {
+      borderColor: '#2563eb',
+      backgroundColor: c.surface,
+    },
+    inputIcon: { marginRight: 8 },
+    input: {
+      flex: 1, fontSize: 15, color: c.text,
+    },
+
+    btn:         { backgroundColor: '#2563eb', borderRadius: 10, padding: 15, alignItems: 'center', marginTop: 28 },
+    btnDisabled: { opacity: 0.45 },
     btnText:     { color: '#fff', fontWeight: '700', fontSize: 16 },
   })
 }
