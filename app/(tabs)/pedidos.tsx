@@ -1,9 +1,10 @@
 import { useState, useCallback, useEffect } from 'react'
 import {
   View, Text, FlatList, TouchableOpacity, StyleSheet,
-  Modal, SafeAreaView, ScrollView, Alert, ActivityIndicator,
+  Modal, ScrollView, Alert, ActivityIndicator,
   RefreshControl, TextInput, KeyboardAvoidingView, Platform,
 } from 'react-native'
+import { SafeAreaView } from 'react-native-safe-area-context'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Ionicons } from '@expo/vector-icons'
 import { api } from '@/lib/api'
@@ -159,7 +160,7 @@ function PayModal({ order, onClose, onRefresh }: {
   const methodLabel = (key: string) => methods.find((m) => m.key === key)?.label ?? key
 
   return (
-    <Modal visible animationType="slide" presentationStyle="pageSheet">
+    <Modal visible animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
       <SafeAreaView style={s.detailRoot}>
         <View style={s.detailHeader}>
           <Text style={s.detailTitle}>Cobrar pedido</Text>
@@ -502,7 +503,7 @@ function DetailModal({ order: orderProp, onClose, onRefresh, onRefreshDetail, re
 
   return (
     <>
-      <Modal visible animationType="slide" presentationStyle="pageSheet">
+      <Modal visible animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
         <SafeAreaView style={s.detailRoot}>
           <View style={s.detailHeader}>
             <Text style={s.detailTitle}>

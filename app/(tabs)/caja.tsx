@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react'
 import {
   View, Text, ScrollView, TouchableOpacity, TextInput,
-  StyleSheet, Alert, ActivityIndicator, RefreshControl, Modal, SafeAreaView,
+  StyleSheet, Alert, ActivityIndicator, RefreshControl, Modal,
 } from 'react-native'
+import { SafeAreaView } from 'react-native-safe-area-context'
 import { useRouter } from 'expo-router'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 
@@ -60,7 +61,7 @@ function OpenModal({ visible, sign, onClose, onDone }: {
   }
 
   return (
-    <Modal visible={visible} animationType="slide" presentationStyle="formSheet">
+    <Modal visible={visible} animationType="slide" presentationStyle="formSheet" onRequestClose={onClose}>
       <SafeAreaView style={styles.modalRoot}>
         <View style={styles.modalHeader}>
           <Text style={styles.modalTitle}>Abrir caja</Text>
@@ -135,7 +136,7 @@ function CloseModal({ visible, expected, sign, onClose, onDone }: {
   }
 
   return (
-    <Modal visible={visible} animationType="slide" presentationStyle="formSheet">
+    <Modal visible={visible} animationType="slide" presentationStyle="formSheet" onRequestClose={onClose}>
       <SafeAreaView style={styles.modalRoot}>
         <View style={styles.modalHeader}>
           <Text style={styles.modalTitle}>Cerrar caja</Text>

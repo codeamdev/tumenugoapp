@@ -1,4 +1,5 @@
 import { View, Text, FlatList, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, RefreshControl } from 'react-native'
+import { SafeAreaView } from 'react-native-safe-area-context'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Ionicons } from '@expo/vector-icons'
 import { api } from '@/lib/api'
@@ -88,7 +89,7 @@ export default function MesasScreen() {
   }
 
   return (
-    <View style={s.root}>
+    <SafeAreaView style={s.root} edges={['bottom']}>
       {/* Counters */}
       <View style={s.topBar}>
         <View style={s.counter}>
@@ -114,7 +115,7 @@ export default function MesasScreen() {
           </View>
         }
       />
-    </View>
+    </SafeAreaView>
   )
 }
 

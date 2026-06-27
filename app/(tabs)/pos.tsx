@@ -2,8 +2,9 @@ import { useState, useMemo, useCallback } from 'react'
 import {
   View, Text, FlatList, TouchableOpacity, StyleSheet,
   TextInput, Modal, ScrollView, Alert, ActivityIndicator,
-  SafeAreaView, KeyboardAvoidingView, Platform, RefreshControl,
+  KeyboardAvoidingView, Platform, RefreshControl,
 } from 'react-native'
+import { SafeAreaView } from 'react-native-safe-area-context'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Ionicons } from '@expo/vector-icons'
 import { api } from '@/lib/api'
@@ -109,7 +110,7 @@ function ModifiersModal({ product, onAdd, onClose }: {
   const total     = unitPrice * qty
 
   return (
-    <Modal visible animationType="slide" presentationStyle="pageSheet">
+    <Modal visible animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
       <SafeAreaView style={s.modRoot}>
         <View style={s.modHeader}>
           <TouchableOpacity onPress={onClose}>
@@ -309,7 +310,7 @@ function FreeProductModal({ visible, onAdd, onClose }: {
   const [price, setPrice] = useState('')
 
   return (
-    <Modal visible={visible} animationType="fade" transparent>
+    <Modal visible={visible} animationType="fade" transparent onRequestClose={onClose}>
       <View style={s.freeOverlay}>
         <View style={s.freeCard}>
           <Text style={s.freeTitle}>Producto libre</Text>
@@ -461,7 +462,7 @@ function CartModal({ visible, onClose, tables }: {
   ]
 
   return (
-    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet">
+    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
       <SafeAreaView style={s.cartRoot}>
         <View style={s.cartHeader}>
           <Text style={s.cartTitle}>Carrito</Text>

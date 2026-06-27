@@ -3,6 +3,7 @@ import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
   ActivityIndicator, RefreshControl,
 } from 'react-native'
+import { SafeAreaView } from 'react-native-safe-area-context'
 import { useRouter } from 'expo-router'
 import { useQuery } from '@tanstack/react-query'
 import { Ionicons } from '@expo/vector-icons'
@@ -112,8 +113,9 @@ export default function InformesScreen() {
   const maxDay    = Math.max(...(d?.dailySeries?.map((p) => p.sales) ?? [0]))
 
   return (
+    <SafeAreaView style={s.root} edges={['bottom']}>
     <ScrollView
-      style={s.root}
+      style={{ flex: 1 }}
       contentContainerStyle={s.scroll}
       refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={PRIMARY} />}
     >
@@ -265,6 +267,7 @@ export default function InformesScreen() {
         </View>
       )}
     </ScrollView>
+    </SafeAreaView>
   )
 }
 

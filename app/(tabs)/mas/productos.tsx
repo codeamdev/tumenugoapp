@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import { View, Text, FlatList, TouchableOpacity, StyleSheet, Switch, Alert, ActivityIndicator, RefreshControl } from 'react-native'
+import { SafeAreaView } from 'react-native-safe-area-context'
 import { useRouter } from 'expo-router'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Ionicons } from '@expo/vector-icons'
@@ -107,7 +108,7 @@ export default function ProductosScreen() {
   }
 
   return (
-    <View style={s.root}>
+    <SafeAreaView style={s.root} edges={['bottom']}>
       {/* Stats bar */}
       <View style={s.topBar}>
         <View style={s.counter}>
@@ -135,7 +136,7 @@ export default function ProductosScreen() {
           </View>
         }
       />
-    </View>
+    </SafeAreaView>
   )
 }
 

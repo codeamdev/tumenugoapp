@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react'
 import {
   View, Text, FlatList, TouchableOpacity, StyleSheet, Switch, Alert,
-  ActivityIndicator, RefreshControl, Modal, SafeAreaView, ScrollView,
+  ActivityIndicator, RefreshControl, Modal, ScrollView,
   TextInput, KeyboardAvoidingView, Platform,
 } from 'react-native'
+import { SafeAreaView } from 'react-native-safe-area-context'
 import { useRouter } from 'expo-router'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Ionicons } from '@expo/vector-icons'
@@ -168,7 +169,7 @@ function UserModal({ visible, editing, onClose, onDone, isConnected, c }: {
   }
 
   return (
-    <Modal visible={visible} animationType="slide" presentationStyle="formSheet">
+    <Modal visible={visible} animationType="slide" presentationStyle="formSheet" onRequestClose={onClose}>
       <SafeAreaView style={s.modalRoot}>
         <View style={s.modalHeader}>
           <Text style={s.modalTitle}>{isEdit ? 'Editar usuario' : 'Nuevo usuario'}</Text>

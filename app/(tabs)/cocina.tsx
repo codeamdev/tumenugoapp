@@ -2,6 +2,7 @@ import {
   View, Text, FlatList, TouchableOpacity, StyleSheet,
   Alert, ActivityIndicator, RefreshControl,
 } from 'react-native'
+import { SafeAreaView } from 'react-native-safe-area-context'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Ionicons } from '@expo/vector-icons'
 import { api } from '@/lib/api'
@@ -151,7 +152,7 @@ export default function CocinaScreen() {
   }
 
   return (
-    <View style={styles.root}>
+    <SafeAreaView style={styles.root} edges={['bottom']}>
       {/* Barra de contadores */}
       <View style={styles.topBar}>
         <View style={styles.counter}>
@@ -178,7 +179,7 @@ export default function CocinaScreen() {
           </View>
         }
       />
-    </View>
+    </SafeAreaView>
   )
 }
 
