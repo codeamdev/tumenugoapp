@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from 'react'
+import { useState, useMemo, useCallback, useRef } from 'react'
 import {
   View, Text, FlatList, TouchableOpacity, StyleSheet,
   TextInput, Modal, ScrollView, Alert, ActivityIndicator,
@@ -465,6 +465,10 @@ function CartModal({ visible, onClose, tables }: {
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
       <SafeAreaView style={s.cartRoot}>
         <View style={s.cartHeader}>
+          <TouchableOpacity style={s.cartAddMore} onPress={onClose}>
+            <Ionicons name="add-circle-outline" size={18} color={PRIMARY} />
+            <Text style={[s.cartAddMoreText, { color: PRIMARY }]}>Agregar</Text>
+          </TouchableOpacity>
           <Text style={s.cartTitle}>Carrito</Text>
           <TouchableOpacity onPress={onClose}>
             <Ionicons name="close" size={24} color={c.textSecondary} />
@@ -672,7 +676,9 @@ function makeCartStyles(c: ReturnType<typeof useAppColors>) {
       paddingHorizontal: 20, paddingVertical: 16,
       borderBottomWidth: 1, borderBottomColor: c.surfaceAlt,
     },
-    cartTitle:   { fontSize: 18, fontWeight: '700', color: c.text },
+    cartTitle:       { fontSize: 18, fontWeight: '700', color: c.text },
+    cartAddMore:     { flexDirection: 'row', alignItems: 'center', gap: 4 },
+    cartAddMoreText: { fontSize: 14, fontWeight: '600' },
     section:     { paddingHorizontal: 20, paddingVertical: 12 },
     sectionLabel:{ fontSize: 11, fontWeight: '700', color: c.textMuted, textTransform: 'uppercase', marginBottom: 10, letterSpacing: 0.5 },
     chipRow:     { flexDirection: 'row', gap: 8 },
@@ -731,11 +737,19 @@ export default function PosScreen() {
   const PRIMARY = tenant?.primaryColor ?? '#2563eb'
   const sign    = tenant?.currencySign ?? '$'
 
+  const searchRef = useRef<TextInput>(null)
+
   const [categoryId, setCategoryId]           = useState<string | null>(null)
   const [search, setSearch]                   = useState('')
   const [cartOpen, setCartOpen]               = useState(false)
   const [freeOpen, setFreeOpen]               = useState(false)
   const [modProduct, setModProduct]           = useState<Product | null>(null)
+
+  // Limpia el buscador y lo enfoca para que el cajero pueda buscar el siguiente producto
+  function focusSearch() {
+    setSearch('')
+    setTimeout(() => searchRef.current?.focus(), 50)
+  }
 
   const filtered = useMemo(() => {
     let list = products.filter((p) => p.isAvailable)
@@ -749,11 +763,14 @@ export default function PosScreen() {
       setModProduct(product)
     } else {
       addItem({ productId: product.id, name: product.name, unitPrice: parseFloat(product.price), quantity: 1, modifiers: [], notes: '' })
+      focusSearch()
     }
   }, [addItem])
 
   function handleModAdd(product: Product, { modifiers, quantity, notes }: { modifiers: any[]; quantity: number; notes: string }) {
     addItem({ productId: product.id, name: product.name, unitPrice: parseFloat(product.price), quantity, modifiers, notes })
+    setModProduct(null)
+    focusSearch()
   }
 
   if (loadingProds) {
@@ -770,6 +787,7 @@ export default function PosScreen() {
       <View style={s.searchBar}>
         <Ionicons name="search-outline" size={18} color={c.textMuted} style={{ marginRight: 8 }} />
         <TextInput
+          ref={searchRef}
           style={s.searchInput}
           placeholder="Buscar producto..."
           placeholderTextColor={c.textMuted}
@@ -862,7 +880,7 @@ export default function PosScreen() {
       <FreeProductModal
         visible={freeOpen}
         onClose={() => setFreeOpen(false)}
-        onAdd={(name, price) => addItem({ productId: null, name, unitPrice: price, quantity: 1, modifiers: [], notes: '' })}
+        onAdd={(name, price) => { addItem({ productId: null, name, unitPrice: price, quantity: 1, modifiers: [], notes: '' }); focusSearch() }}
       />
 
       {modProduct && (
