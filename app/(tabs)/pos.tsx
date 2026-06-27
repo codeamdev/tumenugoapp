@@ -4,7 +4,8 @@ import {
   TextInput, Modal, ScrollView, Alert, ActivityIndicator,
   KeyboardAvoidingView, Platform, RefreshControl,
 } from 'react-native'
-import { SafeAreaView } from 'react-native-safe-area-context'
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
+import { useRouter } from 'expo-router'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Ionicons } from '@expo/vector-icons'
 import { api } from '@/lib/api'
@@ -373,6 +374,8 @@ function CartModal({ visible, onClose, tables }: {
   const c = useAppColors()
   const s = makeCartStyles(c)
   const qc = useQueryClient()
+  const router = useRouter()
+  const { bottom: bottomInset } = useSafeAreaInsets()
   const { tenant, config } = useAuthStore()
   const PRIMARY = tenant?.primaryColor ?? '#2563eb'
   const sign    = tenant?.currencySign ?? '$'
@@ -435,7 +438,8 @@ function CartModal({ visible, onClose, tables }: {
       clearCart()
       onClose()
       qc.invalidateQueries({ queryKey: ['orders'] })
-      Alert.alert('Pedido creado', 'El pedido fue enviado correctamente.')
+      qc.invalidateQueries({ queryKey: ['kitchen'] })
+      router.push('/(tabs)/pedidos')
     } catch (err: any) {
       const isNetworkError = !isConnected || err?.message?.includes('Network request failed') || err?.message?.includes('fetch')
       if (isNetworkError) {
@@ -443,10 +447,8 @@ function CartModal({ visible, onClose, tables }: {
         enqueueSync('create_order', orderPayload)
         clearCart()
         onClose()
-        Alert.alert(
-          'Sin conexión',
-          'El pedido se guardó localmente y se enviará automáticamente cuando vuelva la conexión.',
-        )
+        // Sin conexión: navega igual a pedidos; el banner offline informa al usuario
+        router.push('/(tabs)/pedidos')
       } else {
         Alert.alert('Error', err.message ?? 'No se pudo crear el pedido')
       }
@@ -633,8 +635,8 @@ function CartModal({ visible, onClose, tables }: {
             </View>
           </ScrollView>
 
-          {/* Footer */}
-          <View style={s.cartFooter}>
+          {/* Footer — paddingBottom extra para la barra de navegación del sistema */}
+          <View style={[s.cartFooter, { paddingBottom: Math.max(20, bottomInset + 12) }]}>
             <View style={s.totalRow}>
               <Text style={s.totalLabel}>{isDelivery ? 'Subtotal' : 'Total'}</Text>
               <Text style={isDelivery ? s.totalSubValue : s.totalValue}>{formatCurrency(subtotal, sign)}</Text>
