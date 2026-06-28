@@ -419,6 +419,7 @@ function CartModal({ visible, onClose, tables }: {
       customerAddress: isDelivery && (dfFields?.address ?? true) && customerAddress ? customerAddress : undefined,
       deliveryFee: isDelivery && (dfFields?.fee ?? true) ? deliveryFeeNum : 0,
       notes: notes || undefined,
+      sendToKitchen: true,
       items: items.map((i) => ({
         productId: i.productId ?? undefined,
         customName: i.productId ? undefined : i.name,
