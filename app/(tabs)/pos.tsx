@@ -939,7 +939,10 @@ export default function PosScreen() {
       {/* ── Contenido principal ── */}
       {showCategories ? (
         // Vista: grid de categorías
+        // key="cats" fuerza remontaje al alternar con la lista de productos
+        // (cambiar numColumns en un FlatList existente causa crash en RN)
         <FlatList
+          key="cats"
           data={activeCategories}
           keyExtractor={(c) => c.id}
           numColumns={3}
@@ -958,6 +961,7 @@ export default function PosScreen() {
       ) : (
         // Vista: productos (en categoría o búsqueda)
         <FlatList
+          key="prods"
           data={visibleProducts}
           keyExtractor={(p) => p.id}
           contentContainerStyle={{ paddingBottom: itemCount > 0 ? 100 : 20 }}
