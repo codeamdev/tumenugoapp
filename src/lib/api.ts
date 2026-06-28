@@ -11,17 +11,6 @@ export class ApiError extends Error {
   }
 }
 
-function isNetworkError(err: unknown): boolean {
-  if (err instanceof TypeError) return true
-  const msg = (err as any)?.message ?? ''
-  return (
-    msg.includes('Network request failed') ||
-    msg.includes('Failed to fetch') ||
-    msg.includes('network') ||
-    msg.includes('timeout')
-  )
-}
-
 // Single-flight guard
 let inflightRefresh: Promise<void> | null = null
 
