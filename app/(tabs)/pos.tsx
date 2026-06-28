@@ -252,49 +252,127 @@ function makeModStyles(c: ReturnType<typeof useAppColors>) {
 
 // ─── Tarjeta de producto ──────────────────────────────────────────────────────
 
-function ProductCard({ product, onPress }: { product: Product; onPress: () => void }) {
-  const c = useAppColors()
-  const s = makeProductCardStyles(c)
-  const { tenant } = useAuthStore()
-  const PRIMARY = tenant?.primaryColor ?? '#2563eb'
-  const sign    = tenant?.currencySign ?? '$'
-  const hasModifiers = (product.modifierGroups?.length ?? 0) > 0
+// ─── Fila de producto (vista de categoría) ────────────────────────────────────
 
+function ProductRow({ product, onPress, PRIMARY, sign, c }: {
+  product: Product
+  onPress: () => void
+  PRIMARY: string
+  sign: string
+  c: ReturnType<typeof useAppColors>
+}) {
+  const hasModifiers = (product.modifierGroups?.length ?? 0) > 0
   return (
-    <TouchableOpacity style={s.productCard} onPress={onPress} activeOpacity={0.75}>
-      <View style={[s.productIcon, { backgroundColor: PRIMARY + '18' }]}>
-        <Ionicons name="fast-food-outline" size={26} color={PRIMARY} />
+    <TouchableOpacity
+      style={[rStyles.row, { borderBottomColor: c.border }]}
+      onPress={onPress}
+      activeOpacity={0.7}
+    >
+      <View style={{ flex: 1 }}>
+        <Text style={[rStyles.name, { color: c.text }]} numberOfLines={1}>{product.name}</Text>
+        {hasModifiers && <Text style={[rStyles.sub, { color: c.textMuted }]}>Personalizable</Text>}
       </View>
-      <Text style={s.productName} numberOfLines={2}>{product.name}</Text>
-      <View style={s.productBottom}>
-        <Text style={[s.productPrice, { color: PRIMARY }]}>{formatCurrency(parseFloat(product.price), sign)}</Text>
-        {hasModifiers && (
-          <View style={[s.customBadge, { backgroundColor: PRIMARY + '18' }]}>
-            <Text style={[s.customBadgeText, { color: PRIMARY }]}>Personalizable</Text>
-          </View>
-        )}
+      <Text style={[rStyles.price, { color: PRIMARY }]}>{formatCurrency(parseFloat(product.price), sign)}</Text>
+      <View style={[rStyles.addBtn, { backgroundColor: PRIMARY + '18' }]}>
+        <Ionicons name="add" size={20} color={PRIMARY} />
       </View>
     </TouchableOpacity>
   )
 }
 
-function makeProductCardStyles(c: ReturnType<typeof useAppColors>) {
-  return StyleSheet.create({
-    productCard: {
-      flex: 1, margin: 6, backgroundColor: c.surface, borderRadius: 14, padding: 14,
-      shadowColor: c.shadow, shadowOpacity: 0.05, shadowRadius: 8, elevation: 2,
-    },
-    productIcon: {
-      width: 52, height: 52, borderRadius: 26,
-      alignItems: 'center', justifyContent: 'center', marginBottom: 8,
-    },
-    productName:    { fontSize: 13, fontWeight: '600', color: c.text, marginBottom: 6 },
-    productBottom:  { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 4 },
-    productPrice:   { fontSize: 14, fontWeight: '700' },
-    customBadge:    { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 },
-    customBadgeText:{ fontSize: 9, fontWeight: '700' },
-  })
+const rStyles = StyleSheet.create({
+  row:    { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1, gap: 12 },
+  name:   { fontSize: 15, fontWeight: '600' },
+  sub:    { fontSize: 12, marginTop: 2 },
+  price:  { fontSize: 14, fontWeight: '700', minWidth: 64, textAlign: 'right' },
+  addBtn: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
+})
+
+// ─── Tarjeta de categoría ─────────────────────────────────────────────────────
+
+function CategoryCard({ cat, onPress, c }: {
+  cat: Category
+  onPress: () => void
+  c: ReturnType<typeof useAppColors>
+}) {
+  return (
+    <TouchableOpacity
+      style={[catStyles.card, { backgroundColor: c.surface, shadowColor: c.shadow }]}
+      onPress={onPress}
+      activeOpacity={0.75}
+    >
+      <Text style={catStyles.emoji}>{cat.emoji ?? '📦'}</Text>
+      <Text style={[catStyles.name, { color: c.text }]} numberOfLines={2}>{cat.name}</Text>
+    </TouchableOpacity>
+  )
 }
+
+const catStyles = StyleSheet.create({
+  card:  { flex: 1, margin: 5, borderRadius: 14, padding: 16, alignItems: 'center', gap: 8, shadowOpacity: 0.05, shadowRadius: 6, elevation: 2 },
+  emoji: { fontSize: 32 },
+  name:  { fontSize: 13, fontWeight: '600', textAlign: 'center' },
+})
+
+// ─── Sheet de cantidad ────────────────────────────────────────────────────────
+
+function QuantitySheet({ product, onAdd, onClose, PRIMARY, sign, c }: {
+  product: Product
+  onAdd: (qty: number) => void
+  onClose: () => void
+  PRIMARY: string
+  sign: string
+  c: ReturnType<typeof useAppColors>
+}) {
+  const [qty, setQty] = useState(1)
+  const price = parseFloat(product.price)
+  return (
+    <View style={[qStyles.backdrop]} pointerEvents="box-none">
+      <TouchableOpacity style={StyleSheet.absoluteFill} onPress={onClose} activeOpacity={1} />
+      <View style={[qStyles.sheet, { backgroundColor: c.surface }]}>
+        <View style={qStyles.handle} />
+        <Text style={[qStyles.name, { color: c.text }]} numberOfLines={2}>{product.name}</Text>
+        <Text style={[qStyles.unitPrice, { color: c.textMuted }]}>{formatCurrency(price, sign)} c/u</Text>
+        <View style={qStyles.qtyRow}>
+          <TouchableOpacity
+            style={[qStyles.qtyBtn, { borderColor: c.border }]}
+            onPress={() => setQty((q) => Math.max(1, q - 1))}
+          >
+            <Ionicons name="remove" size={22} color={c.text} />
+          </TouchableOpacity>
+          <Text style={[qStyles.qtyNum, { color: c.text }]}>{qty}</Text>
+          <TouchableOpacity
+            style={[qStyles.qtyBtn, { borderColor: c.border }]}
+            onPress={() => setQty((q) => q + 1)}
+          >
+            <Ionicons name="add" size={22} color={c.text} />
+          </TouchableOpacity>
+        </View>
+        <TouchableOpacity
+          style={[qStyles.addBtn, { backgroundColor: PRIMARY }]}
+          onPress={() => onAdd(qty)}
+          activeOpacity={0.85}
+        >
+          <Text style={qStyles.addBtnText}>
+            Agregar {qty > 1 ? `${qty} · ` : ''}{formatCurrency(price * qty, sign)}
+          </Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  )
+}
+
+const qStyles = StyleSheet.create({
+  backdrop: { position: 'absolute', bottom: 0, left: 0, right: 0, top: 0, justifyContent: 'flex-end' },
+  sheet:    { borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, paddingBottom: 32, gap: 12, shadowOpacity: 0.15, shadowRadius: 20, elevation: 16 },
+  handle:   { width: 40, height: 4, borderRadius: 2, backgroundColor: '#d1d5db', alignSelf: 'center', marginBottom: 4 },
+  name:     { fontSize: 18, fontWeight: '700', textAlign: 'center' },
+  unitPrice:{ fontSize: 13, textAlign: 'center' },
+  qtyRow:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 20, marginVertical: 4 },
+  qtyBtn:   { width: 44, height: 44, borderRadius: 22, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
+  qtyNum:   { fontSize: 28, fontWeight: '800', minWidth: 40, textAlign: 'center' },
+  addBtn:   { borderRadius: 14, padding: 16, alignItems: 'center' },
+  addBtnText:{ color: '#fff', fontWeight: '700', fontSize: 16 },
+})
 
 // ─── Modal: Producto libre ────────────────────────────────────────────────────
 
@@ -724,7 +802,6 @@ function makeCartStyles(c: ReturnType<typeof useAppColors>) {
 
 export default function PosScreen() {
   const c = useAppColors()
-  const s = makePosStyles(c)
   const { data: _products, isLoading: loadingProds, isError: errorProds, isRefetching: refetchingProds, refetch: refetchProds } = useProducts()
   const { data: _categories, refetch: refetchCats } = useCategories()
   const { data: _tables, refetch: refetchTables }   = useTables()
@@ -732,6 +809,7 @@ export default function PosScreen() {
   async function handleRefresh() {
     await Promise.all([refetchProds(), refetchCats(), refetchTables()])
   }
+
   const products   = Array.isArray(_products)   ? _products   : []
   const categories = Array.isArray(_categories) ? _categories : []
   const tables     = Array.isArray(_tables)     ? _tables     : []
@@ -742,140 +820,189 @@ export default function PosScreen() {
 
   const searchRef = useRef<TextInput>(null)
 
-  const [categoryId, setCategoryId]           = useState<string | null>(null)
-  const [search, setSearch]                   = useState('')
-  const [cartOpen, setCartOpen]               = useState(false)
-  const [freeOpen, setFreeOpen]               = useState(false)
-  const [modProduct, setModProduct]           = useState<Product | null>(null)
+  const [categoryId,    setCategoryId]    = useState<string | null>(null)
+  const [search,        setSearch]        = useState('')
+  const [sheetProduct,  setSheetProduct]  = useState<Product | null>(null)
+  const [cartOpen,      setCartOpen]      = useState(false)
+  const [freeOpen,      setFreeOpen]      = useState(false)
+  const [modProduct,    setModProduct]    = useState<Product | null>(null)
 
-  // Limpia el buscador y lo enfoca tras agregar un producto
-  function focusSearch() {
+  const isSearchMode = search.length > 0
+
+  // Solo limpia la búsqueda, sin enfocar — el foco lo da el usuario cuando quiere buscar
+  function clearSearch() {
     setSearch('')
-    requestAnimationFrame(() => searchRef.current?.focus())
   }
 
-  const filtered = useMemo(() => {
-    let list = products.filter((p) => p.isAvailable)
-    if (categoryId) list = list.filter((p) => p.categoryId === categoryId)
-    if (search)     list = list.filter((p) => p.name.toLowerCase().includes(search.toLowerCase()))
-    return list
-  }, [products, categoryId, search])
+  // Productos filtrados para la vista de búsqueda o la vista de categoría
+  const visibleProducts = useMemo(() => {
+    const available = products.filter((p) => p.isAvailable)
+    if (isSearchMode) {
+      return available.filter((p) => p.name.toLowerCase().includes(search.toLowerCase()))
+    }
+    if (categoryId) {
+      return available.filter((p) => p.categoryId === categoryId)
+    }
+    return []
+  }, [products, search, categoryId, isSearchMode])
 
-  const handlePress = useCallback((product: Product) => {
+  // Categorías que tienen al menos un producto disponible
+  const activeCategories = useMemo(() => {
+    const ids = new Set(products.filter((p) => p.isAvailable).map((p) => p.categoryId))
+    return categories.filter((c) => ids.has(c.id))
+  }, [products, categories])
+
+  function handleProductTap(product: Product) {
     if ((product.modifierGroups?.length ?? 0) > 0) {
       setModProduct(product)
     } else {
-      addItem({ productId: product.id, name: product.name, unitPrice: parseFloat(product.price), quantity: 1, modifiers: [], notes: '' })
-      focusSearch()
+      setSheetProduct(product)
     }
-  }, [addItem])
+  }
+
+  function handleSheetAdd(qty: number) {
+    if (!sheetProduct) return
+    addItem({
+      productId: sheetProduct.id,
+      name: sheetProduct.name,
+      unitPrice: parseFloat(sheetProduct.price),
+      quantity: qty,
+      modifiers: [],
+      notes: '',
+    })
+    setSheetProduct(null)
+    setCategoryId(null)  // vuelve al grid de categorías
+    clearSearch()
+  }
 
   function handleModAdd(product: Product, { modifiers, quantity, notes }: { modifiers: any[]; quantity: number; notes: string }) {
     addItem({ productId: product.id, name: product.name, unitPrice: parseFloat(product.price), quantity, modifiers, notes })
     setModProduct(null)
-    focusSearch()
+    setCategoryId(null)  // vuelve al grid de categorías
+    clearSearch()
   }
 
   if (loadingProds) {
-    return <View style={s.centered}><ActivityIndicator size="large" color={PRIMARY} /></View>
+    return <View style={ps.centered}><ActivityIndicator size="large" color={PRIMARY} /></View>
   }
 
   if (errorProds) {
     return <ErrorView message="No se pudieron cargar los productos." onRetry={refetchProds} />
   }
 
+  const showCategories = !isSearchMode && !categoryId
+  const selectedCat    = categoryId ? categories.find((c) => c.id === categoryId) : null
+
   return (
-    <View style={s.root}>
-      {/* Buscador */}
-      <View style={s.searchBar}>
-        <Ionicons name="search-outline" size={18} color={c.textMuted} style={{ marginRight: 8 }} />
-        <TextInput
-          ref={searchRef}
-          style={s.searchInput}
-          placeholder="Buscar producto..."
-          placeholderTextColor={c.textMuted}
-          value={search}
-          onChangeText={setSearch}
-        />
-        {search.length > 0
-          ? (
-            <TouchableOpacity onPress={() => setSearch('')}>
-              <Ionicons name="close-circle" size={18} color={c.textMuted} />
+    <View style={ps.root}>
+
+      {/* ── Barra superior: búsqueda + producto libre ── */}
+      <View style={[ps.topBar, { borderBottomColor: c.border }]}>
+        <View style={[ps.searchWrap, { backgroundColor: c.surfaceAlt, borderColor: c.border }]}>
+          <Ionicons name="search-outline" size={15} color={c.textMuted} />
+          <TextInput
+            ref={searchRef}
+            style={[ps.searchInput, { color: c.text }]}
+            placeholder="Buscar..."
+            placeholderTextColor={c.textMuted}
+            value={search}
+            onChangeText={setSearch}
+            returnKeyType="search"
+          />
+          {search.length > 0 ? (
+            <TouchableOpacity onPress={clearSearch} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <Ionicons name="close-circle" size={16} color={c.textMuted} />
             </TouchableOpacity>
           ) : (
-            <TouchableOpacity onPress={handleRefresh} style={{ padding: 2 }}>
-              <Ionicons
-                name={refetchingProds ? 'sync' : 'refresh-outline'}
-                size={18}
-                color={refetchingProds ? PRIMARY : c.textMuted}
-              />
+            <TouchableOpacity onPress={handleRefresh} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <Ionicons name={refetchingProds ? 'sync' : 'refresh-outline'} size={16} color={refetchingProds ? PRIMARY : c.textMuted} />
             </TouchableOpacity>
-          )
-        }
+          )}
+        </View>
+        <TouchableOpacity style={[ps.freeBtn, { borderColor: PRIMARY }]} onPress={() => setFreeOpen(true)}>
+          <Ionicons name="add" size={16} color={PRIMARY} />
+          <Text style={[ps.freeBtnText, { color: PRIMARY }]}>Libre</Text>
+        </TouchableOpacity>
       </View>
 
-      {/* Categorías */}
-      <ScrollView
-        horizontal showsHorizontalScrollIndicator={false}
-        style={s.catScroll} contentContainerStyle={s.catContent}
-      >
+      {/* ── Breadcrumb al estar dentro de una categoría ── */}
+      {selectedCat && !isSearchMode && (
         <TouchableOpacity
-          style={[s.catChip, !categoryId && { backgroundColor: PRIMARY, borderColor: PRIMARY }]}
+          style={[ps.breadcrumb, { borderBottomColor: c.border, backgroundColor: c.surface }]}
           onPress={() => setCategoryId(null)}
         >
-          <Text style={[s.catChipText, !categoryId && { color: c.textInverse }]}>Todos</Text>
+          <Ionicons name="chevron-back" size={18} color={PRIMARY} />
+          <Text style={[ps.breadcrumbText, { color: PRIMARY }]}>{selectedCat.emoji} {selectedCat.name}</Text>
         </TouchableOpacity>
-        {categories.map((cat) => (
-          <TouchableOpacity
-            key={cat.id}
-            style={[s.catChip, categoryId === cat.id && { backgroundColor: PRIMARY, borderColor: PRIMARY }]}
-            onPress={() => setCategoryId(cat.id)}
-          >
-            <Text style={[s.catChipText, categoryId === cat.id && { color: c.textInverse }]}>
-              {cat.emoji ? `${cat.emoji} ` : ''}{cat.name}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
+      )}
 
-      {/* Grid de productos */}
-      <FlatList
-        data={filtered}
-        keyExtractor={(p) => p.id}
-        numColumns={2}
-        renderItem={({ item }) => <ProductCard product={item} onPress={() => handlePress(item)} />}
-        contentContainerStyle={s.grid}
-        refreshControl={
-          <RefreshControl
-            refreshing={refetchingProds}
-            onRefresh={handleRefresh}
-            tintColor={PRIMARY}
-            colors={[PRIMARY]}
-          />
-        }
-        ListEmptyComponent={
-          <View style={s.centered}>
-            <Ionicons name="fast-food-outline" size={48} color={c.border} />
-            <Text style={s.emptyText}>Sin productos disponibles</Text>
-          </View>
-        }
-      />
+      {/* ── Contenido principal ── */}
+      {showCategories ? (
+        // Vista: grid de categorías
+        <FlatList
+          data={activeCategories}
+          keyExtractor={(c) => c.id}
+          numColumns={3}
+          contentContainerStyle={ps.catGrid}
+          refreshControl={<RefreshControl refreshing={refetchingProds} onRefresh={handleRefresh} tintColor={PRIMARY} colors={[PRIMARY]} />}
+          renderItem={({ item }) => (
+            <CategoryCard cat={item} onPress={() => setCategoryId(item.id)} c={c} />
+          )}
+          ListEmptyComponent={
+            <View style={ps.centered}>
+              <Ionicons name="grid-outline" size={48} color={c.border} />
+              <Text style={[ps.emptyText, { color: c.textMuted }]}>Sin categorías</Text>
+            </View>
+          }
+        />
+      ) : (
+        // Vista: productos (en categoría o búsqueda)
+        <FlatList
+          data={visibleProducts}
+          keyExtractor={(p) => p.id}
+          contentContainerStyle={{ paddingBottom: itemCount > 0 ? 100 : 20 }}
+          refreshControl={<RefreshControl refreshing={refetchingProds} onRefresh={handleRefresh} tintColor={PRIMARY} colors={[PRIMARY]} />}
+          renderItem={({ item }) => (
+            <ProductRow
+              product={item}
+              onPress={() => handleProductTap(item)}
+              PRIMARY={PRIMARY}
+              sign={sign}
+              c={c}
+            />
+          )}
+          ListEmptyComponent={
+            <View style={ps.centered}>
+              <Ionicons name="fast-food-outline" size={48} color={c.border} />
+              <Text style={[ps.emptyText, { color: c.textMuted }]}>
+                {isSearchMode ? 'Sin resultados' : 'Sin productos en esta categoría'}
+              </Text>
+            </View>
+          }
+        />
+      )}
 
-      {/* Botón producto libre */}
-      <TouchableOpacity style={[s.freeProductBtn, { borderColor: PRIMARY }]} onPress={() => setFreeOpen(true)}>
-        <Ionicons name="add-circle-outline" size={16} color={PRIMARY} />
-        <Text style={[s.freeProductText, { color: PRIMARY }]}>Producto libre</Text>
-      </TouchableOpacity>
-
-      {/* FAB carrito */}
+      {/* ── FAB carrito ── */}
       {itemCount > 0 && (
-        <TouchableOpacity style={[s.fab, { backgroundColor: PRIMARY }]} onPress={() => setCartOpen(true)}>
-          <Ionicons name="cart" size={24} color={c.textInverse} />
-          <View style={s.fabBadge}>
-            <Text style={[s.fabBadgeText, { color: PRIMARY }]}>{itemCount}</Text>
+        <TouchableOpacity style={[ps.fab, { backgroundColor: PRIMARY }]} onPress={() => setCartOpen(true)}>
+          <Ionicons name="cart" size={22} color="#fff" />
+          <View style={[ps.fabBadge, { backgroundColor: '#fff' }]}>
+            <Text style={[ps.fabBadgeText, { color: PRIMARY }]}>{itemCount}</Text>
           </View>
-          <Text style={s.fabTotal}>{formatCurrency(getSubtotal(), sign)}</Text>
+          <Text style={ps.fabTotal}>{formatCurrency(getSubtotal(), sign)}</Text>
         </TouchableOpacity>
+      )}
+
+      {/* ── Sheet de cantidad ── */}
+      {sheetProduct && (
+        <QuantitySheet
+          product={sheetProduct}
+          onAdd={handleSheetAdd}
+          onClose={() => setSheetProduct(null)}
+          PRIMARY={PRIMARY}
+          sign={sign}
+          c={c}
+        />
       )}
 
       <CartModal visible={cartOpen} onClose={() => setCartOpen(false)} tables={tables} />
@@ -883,7 +1010,10 @@ export default function PosScreen() {
       <FreeProductModal
         visible={freeOpen}
         onClose={() => setFreeOpen(false)}
-        onAdd={(name, price) => { addItem({ productId: null, name, unitPrice: price, quantity: 1, modifiers: [], notes: '' }); focusSearch() }}
+        onAdd={(name, price) => {
+          addItem({ productId: null, name, unitPrice: price, quantity: 1, modifiers: [], notes: '' })
+          clearSearch()
+        }}
       />
 
       {modProduct && (
@@ -897,46 +1027,42 @@ export default function PosScreen() {
   )
 }
 
-function makePosStyles(c: ReturnType<typeof useAppColors>) {
-  return StyleSheet.create({
-    root:      { flex: 1, backgroundColor: c.background },
-    centered:  { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32, gap: 10 },
-    emptyText: { color: c.textMuted, fontSize: 14 },
+const ps = StyleSheet.create({
+  root:    { flex: 1 },
+  centered:{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32, gap: 10 },
+  emptyText:{ fontSize: 14 },
 
-    searchBar: {
-      flexDirection: 'row', alignItems: 'center',
-      backgroundColor: c.surface, margin: 12, borderRadius: 10,
-      paddingHorizontal: 12, paddingVertical: 10,
-      borderWidth: 1, borderColor: c.border,
-    },
-    searchInput: { flex: 1, fontSize: 15, color: c.text },
+  topBar: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    paddingHorizontal: 12, paddingVertical: 8,
+    borderBottomWidth: 1,
+  },
+  searchWrap: {
+    flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6,
+    borderRadius: 8, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 7,
+  },
+  searchInput: { flex: 1, fontSize: 14, padding: 0 },
+  freeBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    borderWidth: 1, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 7,
+  },
+  freeBtnText: { fontSize: 13, fontWeight: '600' },
 
-    catScroll:   { flexGrow: 0, flexShrink: 0 },
-    catContent:  { paddingHorizontal: 12, paddingVertical: 8, gap: 8, alignItems: 'center' },
-    catChip: {
-      paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20,
-      backgroundColor: c.surfaceAlt, borderWidth: 1, borderColor: c.border,
-      alignSelf: 'center', flexShrink: 0,
-    },
-    catChipText: { fontSize: 13, color: c.textSecondary, fontWeight: '500', flexShrink: 0 },
+  breadcrumb: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    paddingHorizontal: 12, paddingVertical: 10, borderBottomWidth: 1,
+  },
+  breadcrumbText: { fontSize: 15, fontWeight: '600' },
 
-    grid: { padding: 8, paddingBottom: 120 },
+  catGrid: { padding: 8, paddingBottom: 20 },
 
-    freeProductBtn: {
-      flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
-      marginHorizontal: 12, marginBottom: 8, paddingVertical: 10, borderRadius: 10,
-      borderWidth: 1, borderStyle: 'dashed', backgroundColor: c.surface,
-    },
-    freeProductText: { fontSize: 13, fontWeight: '600' },
-
-    fab: {
-      position: 'absolute', bottom: 24, right: 16, left: 16,
-      borderRadius: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-      paddingVertical: 14, paddingHorizontal: 20, gap: 10,
-      shadowColor: c.shadow, shadowOpacity: 0.35, shadowRadius: 12, elevation: 6,
-    },
-    fabBadge:     { backgroundColor: c.surface, borderRadius: 10, paddingHorizontal: 6, paddingVertical: 2 },
-    fabBadgeText: { fontWeight: '800', fontSize: 12 },
-    fabTotal:     { color: '#fff', fontWeight: '700', fontSize: 16 },
-  })
-}
+  fab: {
+    position: 'absolute', bottom: 20, right: 16, left: 16,
+    borderRadius: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    paddingVertical: 13, paddingHorizontal: 20, gap: 10,
+    shadowOpacity: 0.3, shadowRadius: 10, elevation: 6,
+  },
+  fabBadge:    { borderRadius: 10, paddingHorizontal: 6, paddingVertical: 2 },
+  fabBadgeText:{ fontWeight: '800', fontSize: 12 },
+  fabTotal:    { color: '#fff', fontWeight: '700', fontSize: 15 },
+})
