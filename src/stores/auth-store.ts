@@ -1,5 +1,10 @@
 import { create } from 'zustand'
-import { saveToken, saveRefreshToken, saveSession, clearSession, getToken, getRefreshToken, getSavedUser, getSavedTenant, getSavedConfig } from '@/lib/auth'
+import {
+  saveToken, saveRefreshToken, saveSession, clearSession,
+  getToken, getRefreshToken, getSavedUser, getSavedTenant, getSavedConfig,
+  saveOfflineCredential, verifyOfflineCredential, hasOfflineCredential,
+  lockSession, unlockSession, isSessionLocked,
+} from '@/lib/auth'
 import { api } from '@/lib/api'
 import { TENANT_URL } from '@/lib/config'
 import type { AuthUser, AuthTenant, TenantConfig } from '@/types'
@@ -11,9 +16,10 @@ interface AuthState {
   isLoading:       boolean
   isAuthenticated: boolean
 
-  login:   (params: { email: string; password: string; tenantSlug?: string }) => Promise<void>
-  logout:  () => Promise<void>
-  restore: () => Promise<void>
+  login:         (params: { email: string; password: string; tenantSlug?: string }) => Promise<void>
+  offlineLogin:  (params: { email: string; password: string }) => Promise<boolean>
+  logout:        () => Promise<void>
+  restore:       () => Promise<void>
 }
 
 const DEFAULT_CONFIG: TenantConfig = {
@@ -31,10 +37,8 @@ export const useAuthStore = create<AuthState>((set) => ({
   isLoading:       true,
   isAuthenticated: false,
 
+  // Login online: autenticación con el servidor
   login: async ({ email, password, tenantSlug }) => {
-    // Pass tenantSlug as slug override so api.post sends x-tenant-slug for that call.
-    // If tenantSlug is undefined, the env TENANT_SLUG is used (white-label mode).
-    // If both are absent, backend resolves the tenant from user_tenant_map.
     const data = await api.post<{
       user:         AuthUser
       tenant:       AuthTenant
@@ -51,6 +55,10 @@ export const useAuthStore = create<AuthState>((set) => ({
       (data.config ?? DEFAULT_CONFIG) as unknown as Record<string, unknown>,
     )
 
+    // Guarda credencial offline para permitir login sin internet
+    await saveOfflineCredential(email, password)
+    await unlockSession()
+
     set({
       user:            data.user,
       tenant:          data.tenant,
@@ -59,10 +67,34 @@ export const useAuthStore = create<AuthState>((set) => ({
     })
   },
 
+  // Login offline: verifica credenciales localmente y restaura sesión guardada
+  offlineLogin: async ({ email, password }) => {
+    const valid = await verifyOfflineCredential(email, password)
+    if (!valid) return false
+
+    const [token, user, tenant, config] = await Promise.all([
+      getToken(),
+      getSavedUser(),
+      getSavedTenant(),
+      getSavedConfig(),
+    ])
+
+    if (!user || !tenant) return false
+
+    await unlockSession()
+
+    set({
+      user:            user   as unknown as AuthUser,
+      tenant:          tenant as unknown as AuthTenant,
+      config:          (config as unknown as TenantConfig) ?? DEFAULT_CONFIG,
+      isAuthenticated: true,
+    })
+    return true
+  },
+
+  // Logout: intenta revocar en servidor (best-effort) y bloquea la sesión localmente.
+  // Los tokens y datos quedan en el dispositivo para permitir reingreso offline.
   logout: async () => {
-    // Revoke the refresh token on the server before clearing local session.
-    // If the request fails (network down, token already expired), we still
-    // clear locally so the user is not stuck in a broken auth state.
     try {
       const refreshToken = await getRefreshToken()
       if (refreshToken) {
@@ -75,20 +107,29 @@ export const useAuthStore = create<AuthState>((set) => ({
         })
       }
     } catch {
-      // Network error or token already invalid — proceed with local clear
+      // Sin red: la sesión queda bloqueada localmente, se revocará cuando vuelva la conexión
     }
-    await clearSession()
+
+    // Bloquear sesión (soft) — no borrar tokens ni datos offline
+    await lockSession()
     set({ user: null, tenant: null, config: null, isAuthenticated: false })
   },
 
+  // Restaurar sesión al arrancar la app
   restore: async () => {
     try {
+      const locked = await isSessionLocked()
+
+      // Si está bloqueada, no restaurar — el usuario debe volver a ingresar
+      if (locked) return
+
       const [token, user, tenant, config] = await Promise.all([
         getToken(),
         getSavedUser(),
         getSavedTenant(),
         getSavedConfig(),
       ])
+
       if (token && user && tenant) {
         set({
           user:            user   as unknown as AuthUser,
@@ -102,3 +143,6 @@ export const useAuthStore = create<AuthState>((set) => ({
     }
   },
 }))
+
+// Exporta funciones de consulta para la pantalla de login
+export { hasOfflineCredential }

@@ -19,6 +19,7 @@
     "@tanstack/react-query-persist-client": "^5.100.11",
     "expo": "~54.0.0",
     "expo-constants": "~18.0.13",
+    "expo-crypto": "~15.0.9",
     "expo-linking": "~8.0.12",
     "expo-router": "~6.0.23",
     "expo-secure-store": "~15.0.8",

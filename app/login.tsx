@@ -1,11 +1,12 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
   KeyboardAvoidingView, Platform, ScrollView, ActivityIndicator, Alert, Modal, FlatList,
 } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
-import { useAuthStore } from '@/stores/auth-store'
+import { useAuthStore, hasOfflineCredential } from '@/stores/auth-store'
 import { ApiError } from '@/lib/api'
+import { useNetworkStatus } from '@/hooks/use-network'
 import { useAppColors } from '@/lib/theme'
 
 // ─── Selector de tenant ───────────────────────────────────────────────────────
@@ -67,7 +68,8 @@ function makeTenantPickerStyles(c: ReturnType<typeof useAppColors>) {
 // ─── Pantalla de login ────────────────────────────────────────────────────────
 
 export default function LoginScreen() {
-  const { login } = useAuthStore()
+  const { login, offlineLogin } = useAuthStore()
+  const { isConnected } = useNetworkStatus()
   const c = useAppColors()
   const s = makeLoginStyles(c)
   const passwordRef = useRef<TextInput>(null)
@@ -78,12 +80,18 @@ export default function LoginScreen() {
   const [showPassword,  setShowPassword]  = useState(false)
   const [emailFocused,  setEmailFocused]  = useState(false)
   const [passFocused,   setPassFocused]   = useState(false)
+  const [hasOffline,    setHasOffline]    = useState(false)
 
   const [tenantOptions, setTenantOptions] = useState<TenantOption[] | null>(null)
   const [pendingCreds,  setPendingCreds]  = useState<{ email: string; password: string } | null>(null)
 
+  useEffect(() => {
+    hasOfflineCredential().then(setHasOffline)
+  }, [])
+
   const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())
   const canSubmit  = email.trim().length > 0 && password.length > 0 && !loading
+  const isOffline  = !isConnected
 
   async function handleLogin(slugOverride?: string) {
     const trimEmail = email.trim().toLowerCase()
@@ -103,6 +111,21 @@ export default function LoginScreen() {
           return
         }
       }
+
+      // Sin conexión: intentar login offline con credenciales guardadas
+      const isNetworkErr = err instanceof ApiError && err.status === 0
+      if (isNetworkErr) {
+        const ok = await offlineLogin({ email: trimEmail, password })
+        if (ok) return  // AuthGuard redirigirá automáticamente
+        Alert.alert(
+          'Sin conexión',
+          hasOffline
+            ? 'Contraseña incorrecta. Intenta de nuevo.'
+            : 'No hay datos guardados en este dispositivo. Necesitás internet para el primer ingreso.',
+        )
+        return
+      }
+
       const message = err instanceof ApiError ? err.message : 'Error de conexión.'
       Alert.alert('Error al iniciar sesión', message)
     } finally {
@@ -144,6 +167,18 @@ export default function LoginScreen() {
           </View>
 
           <View style={s.card}>
+            {/* Banner sin conexión */}
+            {isOffline && (
+              <View style={[s.offlineBanner, { backgroundColor: hasOffline ? '#fef3c7' : '#fee2e2' }]}>
+                <Ionicons name="cloud-offline-outline" size={16} color={hasOffline ? '#92400e' : '#991b1b'} />
+                <Text style={[s.offlineBannerText, { color: hasOffline ? '#92400e' : '#991b1b' }]}>
+                  {hasOffline
+                    ? 'Sin internet — podés ingresar con tu contraseña'
+                    : 'Sin internet — necesitás conexión para el primer ingreso'}
+                </Text>
+              </View>
+            )}
+
             {/* Email */}
             <Text style={s.fieldLabel}>Correo electrónico</Text>
             <View style={[s.inputWrap, emailFocused && s.inputWrapFocused]}>
@@ -274,5 +309,11 @@ function makeLoginStyles(c: ReturnType<typeof useAppColors>) {
     btn:         { backgroundColor: '#2563eb', borderRadius: 10, padding: 15, alignItems: 'center', marginTop: 28 },
     btnDisabled: { opacity: 0.45 },
     btnText:     { color: '#fff', fontWeight: '700', fontSize: 16 },
+
+    offlineBanner: {
+      flexDirection: 'row', alignItems: 'center', gap: 8,
+      borderRadius: 8, padding: 10, marginBottom: 16,
+    },
+    offlineBannerText: { fontSize: 13, flex: 1, lineHeight: 18 },
   })
 }
