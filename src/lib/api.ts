@@ -1,5 +1,6 @@
 import { getToken, saveToken, getRefreshToken, saveRefreshToken, clearSession } from './auth'
 import { TENANT_URL, TENANT_SLUG } from './config'
+import { triggerAuthFail } from './auth-signal'
 
 export class ApiError extends Error {
   body?: unknown
@@ -98,15 +99,17 @@ async function request<T>(
         // TanStack Query will serve from cache and retry when online
         throw new ApiError('Sin conexión', 0)
       }
-      // Server explicitly rejected credentials → log out
+      // Server explicitly rejected credentials → clear session and trigger login redirect
       await clearSession()
+      triggerAuthFail()
       throw new ApiError('Sesión expirada', 401)
     }
   }
 
   if (response.status === 401 || response.status === 307) {
-    // Second attempt also failed with auth error → log out
+    // Second attempt also failed with auth error → clear session and redirect
     await clearSession()
+    triggerAuthFail()
     throw new ApiError('Sesión expirada', 401)
   }
 

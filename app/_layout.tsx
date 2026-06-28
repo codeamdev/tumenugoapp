@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { BackHandler, ToastAndroid, Platform } from 'react-native'
+import { setOnAuthFail } from '@/lib/auth-signal'
 import { Stack, useRouter, useSegments } from 'expo-router'
 import { QueryClient } from '@tanstack/react-query'
 import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client'
@@ -88,6 +89,13 @@ function SyncManager() {
   useOfflineSync()
   return null
 }
+
+// Registra el callback de fallo de auth una sola vez al arrancar la app.
+// Cuando api.ts detecta que el refresh token fue rechazado por el servidor,
+// llama triggerAuthFail() → esto limpia el estado Zustand → AuthGuard redirige al login.
+setOnAuthFail(() => {
+  useAuthStore.getState().logout()
+})
 
 export default function RootLayout() {
   return (
