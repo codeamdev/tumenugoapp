@@ -15,7 +15,7 @@ import { useNetworkStatus } from '@/hooks/use-network'
 import { ErrorView } from '@/components/ErrorView'
 import { useAppColors } from '@/lib/theme'
 import { ORDER_STATUS_LABELS, ORDER_STATUS_COLORS, ORDER_TYPE_LABELS } from '@/types'
-import type { Order, OrderStatus } from '@/types'
+import type { Order, OrderStatus, Product, Category } from '@/types'
 
 // ─── Tabs ─────────────────────────────────────────────────────────────────────
 
@@ -356,6 +356,218 @@ function makePayStyles(c: ReturnType<typeof useAppColors>) {
   })
 }
 
+// ─── Modal: Agregar productos a pedido existente ──────────────────────────────
+
+interface ItemToAdd { productId: string; name: string; price: number; qty: number }
+
+function AddItemsModal({ order, onClose, onAdded }: {
+  order: Order
+  onClose: () => void
+  onAdded: () => void
+}) {
+  const c = useAppColors()
+  const { tenant } = useAuthStore()
+  const PRIMARY = tenant?.primaryColor ?? '#2563eb'
+  const sign    = tenant?.currencySign ?? '$'
+
+  const { data: prodsData } = useQuery({
+    queryKey: ['products'],
+    queryFn: () => api.get<{ data: Product[] }>('/api/tenant/products').then((r) => r.data ?? []),
+    staleTime: 5 * 60_000,
+    gcTime: 24 * 60 * 60_000,
+  })
+  const { data: catsData } = useQuery({
+    queryKey: ['categories'],
+    queryFn: () => api.get<{ data: Category[] }>('/api/tenant/categories').then((r) => r.data ?? []),
+    staleTime: 10 * 60_000,
+    gcTime: 24 * 60 * 60_000,
+  })
+
+  const products   = (Array.isArray(prodsData) ? prodsData : []).filter((p) => p.isAvailable)
+  const categories = Array.isArray(catsData) ? catsData : []
+
+  const [search,    setSearch]    = useState('')
+  const [catId,     setCatId]     = useState<string | null>(null)
+  const [toAdd,     setToAdd]     = useState<Record<string, ItemToAdd>>({})
+  const [submitting, setSubmitting] = useState(false)
+
+  const visible = search
+    ? products.filter((p) => p.name.toLowerCase().includes(search.toLowerCase()))
+    : catId
+      ? products.filter((p) => p.categoryId === catId)
+      : []
+
+  const totalItems = Object.values(toAdd).reduce((s, i) => s + i.qty, 0)
+
+  function bump(product: Product, delta: number) {
+    setToAdd((prev) => {
+      const cur = prev[product.id]?.qty ?? 0
+      const next = Math.max(0, cur + delta)
+      if (next === 0) {
+        const { [product.id]: _, ...rest } = prev
+        return rest
+      }
+      return { ...prev, [product.id]: { productId: product.id, name: product.name, price: parseFloat(product.price), qty: next } }
+    })
+  }
+
+  async function confirm() {
+    const items = Object.values(toAdd)
+    if (items.length === 0) return
+    setSubmitting(true)
+    try {
+      await api.patch(`/api/tenant/orders/${order.id}`, {
+        action: 'add_items',
+        items: items.map((i) => ({ productId: i.productId, quantity: i.qty, modifiers: [] })),
+      })
+      onAdded()
+      onClose()
+    } catch (err: any) {
+      Alert.alert('Error', err.message ?? 'No se pudo agregar los productos')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  const showingProducts = search.length > 0 || catId !== null
+
+  return (
+    <Modal visible animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: c.background }} edges={['bottom']}>
+        {/* Header */}
+        <View style={[ai.header, { borderBottomColor: c.border }]}>
+          <Text style={[ai.title, { color: c.text }]}>Agregar productos</Text>
+          <TouchableOpacity onPress={onClose}>
+            <Ionicons name="close" size={24} color={c.textSecondary} />
+          </TouchableOpacity>
+        </View>
+
+        {/* Buscador */}
+        <View style={[ai.searchRow, { borderBottomColor: c.border }]}>
+          <View style={[ai.searchWrap, { backgroundColor: c.surfaceAlt, borderColor: c.border }]}>
+            <Ionicons name="search-outline" size={15} color={c.textMuted} />
+            <TextInput
+              style={[ai.searchInput, { color: c.text }]}
+              placeholder="Buscar producto..."
+              placeholderTextColor={c.textMuted}
+              value={search}
+              onChangeText={setSearch}
+            />
+            {search.length > 0 && (
+              <TouchableOpacity onPress={() => setSearch('')}>
+                <Ionicons name="close-circle" size={15} color={c.textMuted} />
+              </TouchableOpacity>
+            )}
+          </View>
+        </View>
+
+        {/* Categorías (chips horizontales) o productos */}
+        {!showingProducts ? (
+          <>
+            <Text style={[ai.hint, { color: c.textMuted }]}>Selecciona una categoría o busca por nombre</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={ai.chipScroll} contentContainerStyle={ai.chipContent}>
+              {categories.map((cat) => (
+                <TouchableOpacity
+                  key={cat.id}
+                  style={[ai.chip, { backgroundColor: c.surfaceAlt, borderColor: c.border }]}
+                  onPress={() => setCatId(cat.id)}
+                >
+                  <Text style={[ai.chipText, { color: c.textSecondary }]}>{cat.emoji} {cat.name}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </>
+        ) : (
+          <>
+            {catId && !search && (
+              <TouchableOpacity style={[ai.back, { borderBottomColor: c.border }]} onPress={() => setCatId(null)}>
+                <Ionicons name="chevron-back" size={16} color={PRIMARY} />
+                <Text style={[ai.backText, { color: PRIMARY }]}>{categories.find((c) => c.id === catId)?.name}</Text>
+              </TouchableOpacity>
+            )}
+            <FlatList
+              data={visible}
+              keyExtractor={(p) => p.id}
+              renderItem={({ item }) => {
+                const qty = toAdd[item.id]?.qty ?? 0
+                return (
+                  <View style={[ai.prodRow, { borderBottomColor: c.border }]}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={[ai.prodName, { color: c.text }]} numberOfLines={1}>{item.name}</Text>
+                      <Text style={[ai.prodPrice, { color: PRIMARY }]}>{formatCurrency(parseFloat(item.price), sign)}</Text>
+                    </View>
+                    <View style={ai.qtyCtrl}>
+                      <TouchableOpacity
+                        style={[ai.qtyBtn, { borderColor: qty > 0 ? PRIMARY : c.border }]}
+                        onPress={() => bump(item, -1)}
+                        disabled={qty === 0}
+                      >
+                        <Ionicons name="remove" size={16} color={qty > 0 ? PRIMARY : c.textMuted} />
+                      </TouchableOpacity>
+                      <Text style={[ai.qtyNum, { color: qty > 0 ? PRIMARY : c.textMuted }]}>{qty}</Text>
+                      <TouchableOpacity
+                        style={[ai.qtyBtn, { borderColor: PRIMARY }]}
+                        onPress={() => bump(item, 1)}
+                      >
+                        <Ionicons name="add" size={16} color={PRIMARY} />
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                )
+              }}
+              ListEmptyComponent={
+                <View style={{ alignItems: 'center', padding: 32 }}>
+                  <Text style={{ color: c.textMuted }}>Sin productos</Text>
+                </View>
+              }
+            />
+          </>
+        )}
+
+        {/* Botón confirmar */}
+        {totalItems > 0 && (
+          <View style={[ai.footer, { borderTopColor: c.border }]}>
+            <TouchableOpacity
+              style={[ai.confirmBtn, { backgroundColor: PRIMARY }, submitting && { opacity: 0.6 }]}
+              onPress={confirm}
+              disabled={submitting}
+            >
+              {submitting
+                ? <ActivityIndicator color="#fff" />
+                : <Text style={ai.confirmText}>Agregar {totalItems} producto{totalItems !== 1 ? 's' : ''}</Text>
+              }
+            </TouchableOpacity>
+          </View>
+        )}
+      </SafeAreaView>
+    </Modal>
+  )
+}
+
+const ai = StyleSheet.create({
+  header:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 16, borderBottomWidth: 1 },
+  title:       { fontSize: 17, fontWeight: '700' },
+  searchRow:   { paddingHorizontal: 12, paddingVertical: 8, borderBottomWidth: 1 },
+  searchWrap:  { flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: 8, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 7 },
+  searchInput: { flex: 1, fontSize: 14, padding: 0 },
+  hint:        { fontSize: 12, textAlign: 'center', paddingTop: 12, paddingHorizontal: 16 },
+  chipScroll:  { flexGrow: 0, marginTop: 8 },
+  chipContent: { paddingHorizontal: 12, paddingBottom: 12, gap: 8 },
+  chip:        { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, borderWidth: 1 },
+  chipText:    { fontSize: 13, fontWeight: '500' },
+  back:        { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 12, paddingVertical: 10, borderBottomWidth: 1 },
+  backText:    { fontSize: 14, fontWeight: '600' },
+  prodRow:     { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, gap: 12 },
+  prodName:    { fontSize: 14, fontWeight: '600' },
+  prodPrice:   { fontSize: 12, marginTop: 2 },
+  qtyCtrl:     { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  qtyBtn:      { width: 30, height: 30, borderRadius: 15, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
+  qtyNum:      { fontSize: 15, fontWeight: '700', minWidth: 20, textAlign: 'center' },
+  footer:      { padding: 16, borderTopWidth: 1 },
+  confirmBtn:  { borderRadius: 12, padding: 15, alignItems: 'center' },
+  confirmText: { color: '#fff', fontWeight: '700', fontSize: 15 },
+})
+
 // ─── Modal detalle ────────────────────────────────────────────────────────────
 
 function DetailModal({ order: orderProp, onClose, onRefresh, onRefreshDetail, readOnly = false }: {
@@ -376,6 +588,7 @@ function DetailModal({ order: orderProp, onClose, onRefresh, onRefreshDetail, re
   const [order, setOrder] = useState(orderProp)
   const [loading, setLoading]       = useState(false)
   const [payOpen, setPayOpen]       = useState(false)
+  const [addOpen, setAddOpen]       = useState(false)
   const [cancellingItem, setCancellingItem] = useState<string | null>(null)
 
   // Sync internal state when a different order is selected
@@ -390,6 +603,7 @@ function DetailModal({ order: orderProp, onClose, onRefresh, onRefreshDetail, re
   const canPay        = !readOnly && ['ready', 'delivered'].includes(order.status)
   const canAdvance    = !readOnly && ['new', 'sent', 'preparing'].includes(order.status)
   const canCancelItem = !readOnly && !['closed', 'cancelled'].includes(order.status)
+  const canAddItems   = !readOnly && !['closed', 'cancelled'].includes(order.status)
 
   const ADVANCE_LABELS: Partial<Record<string, string>> = {
     new: 'Enviar a cocina',
@@ -509,9 +723,17 @@ function DetailModal({ order: orderProp, onClose, onRefresh, onRefreshDetail, re
             <Text style={s.detailTitle}>
               {order.displayCode ?? `Pedido #${order.id.slice(-6).toUpperCase()}`}
             </Text>
-            <TouchableOpacity onPress={onClose}>
-              <Ionicons name="close" size={24} color={c.textSecondary} />
-            </TouchableOpacity>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+              {canAddItems && (
+                <TouchableOpacity onPress={() => setAddOpen(true)} style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                  <Ionicons name="add-circle-outline" size={22} color={PRIMARY} />
+                  <Text style={{ color: PRIMARY, fontWeight: '600', fontSize: 14 }}>Agregar</Text>
+                </TouchableOpacity>
+              )}
+              <TouchableOpacity onPress={onClose}>
+                <Ionicons name="close" size={24} color={c.textSecondary} />
+              </TouchableOpacity>
+            </View>
           </View>
 
           <ScrollView contentContainerStyle={{ paddingBottom: 24 }}>
@@ -636,6 +858,18 @@ function DetailModal({ order: orderProp, onClose, onRefresh, onRefreshDetail, re
           order={order}
           onClose={() => setPayOpen(false)}
           onRefresh={() => { onRefresh(); onClose() }}
+        />
+      )}
+
+      {addOpen && (
+        <AddItemsModal
+          order={order}
+          onClose={() => setAddOpen(false)}
+          onAdded={async () => {
+            setAddOpen(false)
+            if (onRefreshDetail) await onRefreshDetail()
+            onRefresh()
+          }}
         />
       )}
     </>
