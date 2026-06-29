@@ -604,18 +604,6 @@ function CartModal({ visible, onClose, tables }: {
               </View>
             )}
 
-            {/* Cliente */}
-            <View style={s.section}>
-              <Text style={s.sectionLabel}>Cliente (opcional)</Text>
-              <TextInput
-                style={s.cartInput}
-                value={customerName}
-                onChangeText={setCustomerName}
-                placeholder="Nombre del cliente"
-                placeholderTextColor={c.textMuted}
-              />
-            </View>
-
             {/* Campos de domicilio */}
             {isDelivery && (
               <View style={s.section}>

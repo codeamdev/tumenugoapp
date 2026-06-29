@@ -104,17 +104,16 @@ function PayModal({ order, onClose, onRefresh }: {
   const orderTotal = parseFloat(order.total)
 
   const [payments, setPayments] = useState<PaymentRow[]>([{ method: methods[0]?.key ?? 'cash', amount: '' }])
-  const [tip, setTip]           = useState('')
-  const [notes, setNotes]       = useState('')
   const [customerName, setCustomerName] = useState(order.customerName ?? '')
   const [loading, setLoading]   = useState(false)
 
-  const tipNum      = parseFloat(tip) || 0
-  const grandTotal  = orderTotal + tipNum
-  const totalPaid   = payments.reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0)
-  const remaining   = grandTotal - totalPaid
-  const hasCash     = payments.some((p) => p.method === 'cash' && p.amount !== '')
-  const isCredit    = !!(methods.find((m) => m.key === payments[0]?.method)?.isCredit)
+  const grandTotal = orderTotal
+  const totalPaid  = payments.reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0)
+  const remaining  = grandTotal - totalPaid
+  const isCredit   = !!(methods.find((m) => m.key === payments[0]?.method)?.isCredit)
+
+  // Botones de monto rápido (en miles de la divisa local)
+  const QUICK_AMOUNTS = [10000, 20000, 50000, 100000]
 
   function updateRow(idx: number, field: keyof PaymentRow, value: string) {
     setPayments((prev) => prev.map((p, i) => i === idx ? { ...p, [field]: value } : p))
@@ -146,8 +145,6 @@ function PayModal({ order, onClose, onRefresh }: {
       await api.patch(`/api/tenant/orders/${order.id}`, {
         action: 'close',
         payments: validPayments,
-        tipAmount: tipNum,
-        paymentNotes: notes || undefined,
         customerName: isCredit ? customerName.trim() : undefined,
       })
       onRefresh()
@@ -179,12 +176,6 @@ function PayModal({ order, onClose, onRefresh }: {
                   <Text style={s.payTotalLabel}>Pedido</Text>
                   <Text style={[s.payTotalLabel, { color: c.text }]}>{formatCurrency(orderTotal, sign)}</Text>
                 </View>
-                {tipNum > 0 && (
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                    <Text style={s.payTotalLabel}>Propina</Text>
-                    <Text style={[s.payTotalLabel, { color: c.text }]}>{formatCurrency(tipNum, sign)}</Text>
-                  </View>
-                )}
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 4, paddingTop: 4, borderTopWidth: 1, borderTopColor: PRIMARY + '30' }}>
                   <Text style={[s.payTotalLabel, { fontWeight: '700' }]}>Total</Text>
                   <Text style={[s.payTotalValue, { color: PRIMARY }]}>{formatCurrency(grandTotal, sign)}</Text>
@@ -233,6 +224,31 @@ function PayModal({ order, onClose, onRefresh }: {
               </TouchableOpacity>
             </View>
 
+            {/* Botones de monto rápido */}
+            <View style={{ gap: 6 }}>
+              <Text style={s.payLabel}>Monto rápido</Text>
+              <View style={s.quickRow}>
+                {QUICK_AMOUNTS.map((amt) => (
+                  <TouchableOpacity
+                    key={amt}
+                    style={[s.quickBtn, { borderColor: PRIMARY }]}
+                    onPress={() => {
+                      const cur = parseFloat(payments[0]?.amount) || 0
+                      updateRow(0, 'amount', String(cur + amt))
+                    }}
+                  >
+                    <Text style={[s.quickBtnText, { color: PRIMARY }]}>+{amt >= 1000 ? `${amt / 1000}k` : amt}</Text>
+                  </TouchableOpacity>
+                ))}
+                <TouchableOpacity
+                  style={[s.quickBtn, { borderColor: PRIMARY, backgroundColor: PRIMARY + '18' }]}
+                  onPress={() => updateRow(0, 'amount', String(grandTotal))}
+                >
+                  <Text style={[s.quickBtnText, { color: PRIMARY }]}>Exacto</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+
             {/* Resumen de cobro */}
             {totalPaid > 0 && (
               <View style={[s.changeBox, remaining <= 0.01 ? s.changePos : s.changeNeg]}>
@@ -245,20 +261,7 @@ function PayModal({ order, onClose, onRefresh }: {
               </View>
             )}
 
-            {/* Propina */}
-            <View style={{ gap: 8 }}>
-              <Text style={s.payLabel}>Propina (opcional)</Text>
-              <TextInput
-                style={s.payInput}
-                keyboardType="numeric"
-                placeholder={`0 ${sign}`}
-                placeholderTextColor={c.textMuted}
-                value={tip}
-                onChangeText={setTip}
-              />
-            </View>
-
-            {/* Nombre del cliente — obligatorio para crédito */}
+            {/* Nombre — solo para crédito/fiado */}
             {isCredit && (
               <View style={{ gap: 8 }}>
                 <Text style={s.payLabel}>Nombre del cliente *</Text>
@@ -273,31 +276,18 @@ function PayModal({ order, onClose, onRefresh }: {
               </View>
             )}
 
-            {/* Notas */}
-            <View style={{ gap: 8 }}>
-              <Text style={s.payLabel}>{isCredit ? 'Observaciones *' : 'Notas (opcional)'}</Text>
-              <TextInput
-                style={[s.payInput, { minHeight: 60, textAlignVertical: 'top' }]}
-                placeholder={isCredit ? 'Motivo, plazo de pago, referencia...' : 'Observaciones del pago...'}
-                placeholderTextColor={c.textMuted}
-                value={notes}
-                onChangeText={setNotes}
-                multiline
-              />
-            </View>
-
             <TouchableOpacity
               style={[
                 s.confirmBtn,
                 { backgroundColor: isCredit ? '#d97706' : PRIMARY },
-                (loading || (isCredit && (!customerName.trim() || !notes.trim()))) && s.btnDisabled,
+                (loading || (isCredit && !customerName.trim())) && s.btnDisabled,
               ]}
               onPress={confirm}
-              disabled={loading || (isCredit && (!customerName.trim() || !notes.trim()))}
+              disabled={loading || (isCredit && !customerName.trim())}
             >
               {loading
                 ? <ActivityIndicator color={c.textInverse} />
-                : <Text style={s.confirmBtnText}>{isCredit ? 'Registrar deuda' : 'Confirmar cobro'}</Text>}
+                : <Text style={s.confirmBtnText}>{isCredit ? 'Registrar fiado' : 'Confirmar cobro'}</Text>}
             </TouchableOpacity>
           </ScrollView>
         </KeyboardAvoidingView>
@@ -351,6 +341,9 @@ function makePayStyles(c: ReturnType<typeof useAppColors>) {
     changeNeg:   { backgroundColor: c.dangerLight },
     changeLabel: { fontSize: 13, fontWeight: '600', color: c.textSecondary },
     changeValue: { fontSize: 18, fontWeight: '800', color: c.text },
+    quickRow:    { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+    quickBtn:    { borderWidth: 1.5, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8 },
+    quickBtnText:{ fontSize: 13, fontWeight: '700' },
     confirmBtn:  { borderRadius: 12, padding: 16, alignItems: 'center', marginTop: 8 },
     confirmBtnText: { color: '#fff', fontWeight: '700', fontSize: 15 },
   })
@@ -599,8 +592,7 @@ function DetailModal({ order: orderProp, onClose, onRefresh, onRefreshDetail, re
   const color = ORDER_STATUS_COLORS[order.status] ?? '#6b7280'
   const label = ORDER_STATUS_LABELS[order.status] ?? order.status
   const canCancel     = !readOnly && !['closed', 'cancelled'].includes(order.status)
-  const canDeliver    = !readOnly && order.status === 'ready'
-  const canPay        = !readOnly && ['ready', 'delivered'].includes(order.status)
+  const canPay        = !readOnly && order.status === 'ready'
   const canAdvance    = !readOnly && ['new', 'sent', 'preparing'].includes(order.status)
   const canCancelItem = !readOnly && !['closed', 'cancelled'].includes(order.status)
   const canAddItems   = !readOnly && !['closed', 'cancelled'].includes(order.status)
@@ -817,16 +809,6 @@ function DetailModal({ order: orderProp, onClose, onRefresh, onRefreshDetail, re
                 </TouchableOpacity>
               )}
 
-              {canDeliver && (
-                <TouchableOpacity
-                  style={[s.advBtn, { backgroundColor: '#10b981' }, loading && s.btnDisabled]}
-                  onPress={() => advance('delivered')}
-                  disabled={loading}
-                >
-                  <Ionicons name="checkmark-circle-outline" size={18} color={c.textInverse} />
-                  <Text style={s.advBtnText}>Entregar</Text>
-                </TouchableOpacity>
-              )}
 
               {canPay && (
                 <TouchableOpacity

@@ -13,12 +13,12 @@ import { useAuthStore } from '@/stores/auth-store'
 import { useAppColors } from '@/lib/theme'
 import { ErrorView } from '@/components/ErrorView'
 
-type Range = 'today' | '7d' | '30d'
+type Range = 'today' | 'week' | 'month'
 
 const RANGES: { key: Range; label: string }[] = [
   { key: 'today', label: 'Hoy' },
-  { key: '7d',   label: '7 días' },
-  { key: '30d',  label: '30 días' },
+  { key: 'week',  label: 'Semana' },
+  { key: 'month', label: 'Mes' },
 ]
 
 function localDateStr(d: Date): string {
@@ -30,11 +30,30 @@ function localDateStr(d: Date): string {
 
 function getFromTo(range: Range): { from: string; to: string } {
   const now = new Date()
-  const to = localDateStr(now)
-  if (range === 'today') return { from: to, to }
-  const d = new Date(now)
-  d.setDate(d.getDate() - (range === '7d' ? 7 : 30))
-  return { from: localDateStr(d), to }
+
+  if (range === 'today') {
+    const today = localDateStr(now)
+    return { from: today, to: today }
+  }
+
+  if (range === 'week') {
+    // Semana: lunes → domingo
+    const d = new Date(now)
+    const day = d.getDay() // 0=Dom, 1=Lun, ..., 6=Sáb
+    const diffToMonday = day === 0 ? -6 : 1 - day
+    d.setDate(d.getDate() + diffToMonday)
+    const monday = localDateStr(d)
+    const sun = new Date(d)
+    sun.setDate(d.getDate() + 6)
+    return { from: monday, to: localDateStr(sun) }
+  }
+
+  // month: del 1 al último día del mes actual (29/30/31 según corresponda)
+  const year  = now.getFullYear()
+  const month = now.getMonth()
+  const first = new Date(year, month, 1)
+  const last  = new Date(year, month + 1, 0)  // día 0 del mes siguiente = último del actual
+  return { from: localDateStr(first), to: localDateStr(last) }
 }
 
 interface DayPoint  { date: string; sales: number }

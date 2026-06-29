@@ -65,12 +65,37 @@ async function request<T>(
 
   let response: Response
   try {
-    // redirect: 'manual' prevents fetch from auto-following 307 to /login HTML
+    // redirect: 'manual' intenta evitar que fetch siga el 307 a /login HTML.
+    // En React Native puede ignorarse; el Content-Type check más abajo es el fallback.
     response = await fetch(`${TENANT_URL}${path}`, { ...options, headers, redirect: 'manual' })
   } catch (err) {
     // Pure network error (device offline, DNS failure, timeout)
-    // Throw as network error so TanStack Query retries when online
     throw new ApiError('Sin conexión', 0)
+  }
+
+  // Si el servidor siguió la redirección y devolvió HTML (login page),
+  // la respuesta tendrá status 200 pero Content-Type text/html.
+  // Tratarlo como expiración de sesión y disparar refresh.
+  const contentType = response.headers.get('content-type') ?? ''
+  if (response.ok && contentType.includes('text/html')) {
+    if (!isRetry) {
+      try {
+        if (!inflightRefresh) {
+          inflightRefresh = attemptTokenRefresh().finally(() => { inflightRefresh = null })
+        }
+        await inflightRefresh
+        return request<T>(path, options, slugOverride, true)
+      } catch (err) {
+        const msg = (err as Error).message
+        if (msg === 'NETWORK_ERROR') throw new ApiError('Sin conexión', 0)
+        await clearSession()
+        triggerAuthFail()
+        throw new ApiError('Sesión expirada', 401)
+      }
+    }
+    await clearSession()
+    triggerAuthFail()
+    throw new ApiError('Sesión expirada', 401)
   }
 
   // 401 or 307 (Next.js redirect to /login when session expired)
@@ -119,7 +144,24 @@ async function request<T>(
   }
 
   const text = await response.text()
-  return text ? JSON.parse(text) : ({} as T)
+  if (!text) return {} as T
+  try {
+    return JSON.parse(text)
+  } catch {
+    // Respuesta no es JSON (ej: HTML inesperado) — tratar como error de sesión
+    if (!isRetry) {
+      try {
+        if (!inflightRefresh) {
+          inflightRefresh = attemptTokenRefresh().finally(() => { inflightRefresh = null })
+        }
+        await inflightRefresh
+        return request<T>(path, options, slugOverride, true)
+      } catch {}
+    }
+    await clearSession()
+    triggerAuthFail()
+    throw new ApiError('Sesión expirada', 401)
+  }
 }
 
 export const api = {
