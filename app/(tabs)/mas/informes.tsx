@@ -61,9 +61,11 @@ interface TopProduct { name: string; qty: number; revenue: number }
 interface ByCat      { name: string; emoji: string | null; revenue: number; qty: number }
 interface LowItem    { name: string; qty: number }
 
+interface PendingPayment { id: string; closedAt: string | null; total: number; customerName: string }
+
 interface InformeData {
   period: { from: string; to: string }
-  kpis: { totalSales: number; totalOrders: number }
+  kpis: { totalSales: number; totalOrders: number; totalPending?: number; pendingCount?: number }
   byMethod: Record<string, number>
   paymentMethodLabels: Record<string, string>
   byType: Record<string, number>
@@ -71,6 +73,7 @@ interface InformeData {
   topProducts: TopProduct[]
   byCategory: ByCat[]
   lowRotation: LowItem[]
+  pendingPayments?: PendingPayment[]
 }
 
 // ── Simple bar for relative values ───────────────────────────────────────────
