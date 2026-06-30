@@ -15,11 +15,13 @@ interface AuthState {
   config:          TenantConfig | null
   isLoading:       boolean
   isAuthenticated: boolean
+  isSuspended:     boolean
 
   login:         (params: { email: string; password: string; tenantSlug?: string }) => Promise<void>
   offlineLogin:  (params: { email: string; password: string }) => Promise<boolean>
   logout:        () => Promise<void>
   restore:       () => Promise<void>
+  setSuspended:  (val: boolean) => void
 }
 
 const DEFAULT_CONFIG: TenantConfig = {
@@ -36,6 +38,8 @@ export const useAuthStore = create<AuthState>((set) => ({
   config:          null,
   isLoading:       true,
   isAuthenticated: false,
+  isSuspended:     false,
+  setSuspended:    (val) => set({ isSuspended: val }),
 
   // Login online: autenticación con el servidor
   login: async ({ email, password, tenantSlug }) => {

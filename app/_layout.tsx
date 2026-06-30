@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
-import { BackHandler, ToastAndroid, Platform } from 'react-native'
-import { setOnAuthFail } from '@/lib/auth-signal'
+import { View, BackHandler, ToastAndroid, Platform } from 'react-native'
+import { setOnAuthFail, setOnSuspended } from '@/lib/auth-signal'
+import { SuspendedScreen } from '@/components/SuspendedScreen'
 import { Stack, useRouter, useSegments } from 'expo-router'
 import { QueryClient } from '@tanstack/react-query'
 import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client'
@@ -90,12 +91,21 @@ function SyncManager() {
   return null
 }
 
-// Registra el callback de fallo de auth una sola vez al arrancar la app.
-// Cuando api.ts detecta que el refresh token fue rechazado por el servidor,
-// llama triggerAuthFail() → esto limpia el estado Zustand → AuthGuard redirige al login.
-setOnAuthFail(() => {
-  useAuthStore.getState().logout()
-})
+// Callbacks globales de auth/suspension — registrados una vez al arrancar.
+setOnAuthFail(() => { useAuthStore.getState().logout() })
+setOnSuspended(() => { useAuthStore.getState().setSuspended(true) })
+
+// Overlay de suspensión: se muestra por encima de todo cuando el tenant está suspendido.
+// No borra ni modifica nada — solo informa al usuario.
+function SuspensionGuard() {
+  const { isSuspended, tenant } = useAuthStore()
+  if (!isSuspended) return null
+  return (
+    <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 9999 }}>
+      <SuspendedScreen tenantName={tenant?.name} />
+    </View>
+  )
+}
 
 export default function RootLayout() {
   return (
@@ -122,6 +132,7 @@ export default function RootLayout() {
       <AuthGuard />
       <SyncManager />
       <ExitHandler />
+      <SuspensionGuard />
     </PersistQueryClientProvider>
     </SafeAreaProvider>
   )

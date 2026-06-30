@@ -1,6 +1,6 @@
 import { getToken, saveToken, getRefreshToken, saveRefreshToken, clearSession } from './auth'
 import { TENANT_URL, TENANT_SLUG } from './config'
-import { triggerAuthFail } from './auth-signal'
+import { triggerAuthFail, triggerSuspended } from './auth-signal'
 
 export class ApiError extends Error {
   body?: unknown
@@ -143,6 +143,11 @@ async function request<T>(
     try {
       body    = await response.json()
       message = (body as Record<string, unknown>)?.error as string ?? message
+      // Detectar suspensión del tenant → mostrar pantalla informativa
+      const code = (body as Record<string, unknown>)?.code
+      if (response.status === 403 && code === 'TENANT_SUSPENDED') {
+        triggerSuspended()
+      }
     } catch {}
     throw new ApiError(message, response.status, body)
   }
