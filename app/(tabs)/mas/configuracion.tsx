@@ -15,14 +15,25 @@ import { ErrorView } from '@/components/ErrorView'
 
 const PRESET_COLORS = ['#2563eb', '#16a34a', '#dc2626', '#9333ea', '#ea580c', '#0891b2', '#be185d', '#d97706']
 
+interface PaymentMethod { key: string; label: string; isCredit?: boolean }
+
 interface RemoteConfig {
   name: string
   primaryColor: string | null
   currencySign: string | null
   posConfig: {
     deliveryFields: { phone: boolean; address: boolean; notes: boolean; fee: boolean }
+    paymentMethods?: PaymentMethod[]
   } | null
 }
+
+const DEFAULT_PAYMENT_METHODS: PaymentMethod[] = [
+  { key: 'cash',      label: 'Efectivo'      },
+  { key: 'card',      label: 'Tarjeta'       },
+  { key: 'transfer',  label: 'Transferencia' },
+  { key: 'nequi',     label: 'Nequi'         },
+  { key: 'daviplata', label: 'Daviplata'     },
+]
 
 export default function ConfiguracionScreen() {
   const router = useRouter()
@@ -33,11 +44,14 @@ export default function ConfiguracionScreen() {
   const c = useAppColors()
   const styles = makeStyles(c)
 
-  const [saving, setSaving]     = useState(false)
-  const [name, setName]         = useState('')
-  const [color, setColor]       = useState(PRIMARY)
-  const [currency, setCurrency] = useState('$')
-  const [delivery, setDelivery] = useState({ phone: true, address: true, notes: true, fee: true })
+  const [saving, setSaving]           = useState(false)
+  const [name, setName]               = useState('')
+  const [color, setColor]             = useState(PRIMARY)
+  const [currency, setCurrency]       = useState('$')
+  const [delivery, setDelivery]       = useState({ phone: true, address: true, notes: true, fee: true })
+  const [payMethods, setPayMethods]   = useState<PaymentMethod[]>(DEFAULT_PAYMENT_METHODS)
+  const [newMethodLabel, setNewLabel] = useState('')
+  const [newMethodCredit, setNewCredit] = useState(false)
 
   useEffect(() => {
     if (!user) return
@@ -62,6 +76,8 @@ export default function ConfiguracionScreen() {
     setCurrency(configData.currencySign ?? '$')
     const df = configData.posConfig?.deliveryFields
     if (df) setDelivery({ phone: df.phone, address: df.address, notes: df.notes, fee: df.fee })
+    const pm = configData.posConfig?.paymentMethods
+    if (pm && pm.length > 0) setPayMethods(pm)
   }, [configData])
 
   async function handleSave() {
@@ -76,7 +92,7 @@ export default function ConfiguracionScreen() {
         name: name.trim(),
         primaryColor: color,
         currencySign: currency.trim() || '$',
-        posConfig: { deliveryFields: delivery },
+        posConfig: { deliveryFields: delivery, paymentMethods: payMethods },
       })
       qc.invalidateQueries({ queryKey: ['configuracion'] })
       Alert.alert('Guardado', 'La configuración fue actualizada correctamente.')
@@ -86,6 +102,25 @@ export default function ConfiguracionScreen() {
       setSaving(false)
     }
   }
+
+  function addPayMethod() {
+    const label = newMethodLabel.trim()
+    if (!label) return
+    const key = label.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '')
+    if (payMethods.find((m) => m.key === key)) {
+      Alert.alert('Duplicado', 'Ya existe un método con ese nombre.')
+      return
+    }
+    setPayMethods((prev) => [...prev, { key, label, isCredit: newMethodCredit }])
+    setNewLabel('')
+    setNewCredit(false)
+  }
+
+  function removePayMethod(key: string) {
+    setPayMethods((prev) => prev.filter((m) => m.key !== key))
+  }
+
+  const isValidColor = /^#[0-9a-fA-F]{6}$/.test(color)
 
   if (isLoading) {
     return (
@@ -157,9 +192,15 @@ export default function ConfiguracionScreen() {
             autoCapitalize="none"
             editable={isConnected}
           />
-          <View style={[styles.colorPreview, { backgroundColor: color }]}>
-            <Text style={styles.colorPreviewText}>Vista previa del color</Text>
-          </View>
+          {isValidColor ? (
+            <View style={[styles.colorPreview, { backgroundColor: color }]}>
+              <Text style={styles.colorPreviewText}>{color}</Text>
+            </View>
+          ) : (
+            <View style={[styles.colorPreview, { backgroundColor: c.surfaceAlt, borderWidth: 1, borderColor: c.border }]}>
+              <Text style={[styles.colorPreviewText, { color: c.textMuted }]}>Ingresa un color válido (#RRGGBB)</Text>
+            </View>
+          )}
         </View>
 
         {/* Campos de domicilio */}
@@ -186,6 +227,56 @@ export default function ConfiguracionScreen() {
               />
             </View>
           ))}
+        </View>
+
+        {/* Métodos de pago */}
+        <View style={styles.card}>
+          <Text style={styles.sectionTitle}>Métodos de pago</Text>
+          <Text style={styles.hint}>Define los métodos disponibles al cobrar un pedido</Text>
+
+          {payMethods.map((m) => (
+            <View key={m.key} style={styles.pmRow}>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.pmLabel, { color: c.text }]}>{m.label}</Text>
+                {m.isCredit && <Text style={[styles.pmCredit, { color: c.warning }]}>Pendiente de pago</Text>}
+              </View>
+              <TouchableOpacity
+                onPress={() => removePayMethod(m.key)}
+                disabled={!isConnected}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <Ionicons name="trash-outline" size={18} color={isConnected ? c.danger : c.textMuted} />
+              </TouchableOpacity>
+            </View>
+          ))}
+
+          <View style={[styles.pmAddRow, { borderTopColor: c.border }]}>
+            <TextInput
+              style={[styles.input, { flex: 1 }]}
+              value={newMethodLabel}
+              onChangeText={setNewLabel}
+              placeholder="Nombre del método (ej: Bancolombia)"
+              placeholderTextColor={c.textMuted}
+              editable={isConnected}
+            />
+            <View style={styles.pmCreditRow}>
+              <Text style={[styles.hint, { marginBottom: 0 }]}>Fiado</Text>
+              <Switch
+                value={newMethodCredit}
+                onValueChange={setNewCredit}
+                disabled={!isConnected}
+                trackColor={{ false: c.border, true: PRIMARY + '88' }}
+                thumbColor={newMethodCredit ? PRIMARY : c.textMuted}
+              />
+            </View>
+            <TouchableOpacity
+              style={[styles.pmAddBtn, { backgroundColor: newMethodLabel.trim() && isConnected ? PRIMARY : c.border }]}
+              onPress={addPayMethod}
+              disabled={!newMethodLabel.trim() || !isConnected}
+            >
+              <Ionicons name="add" size={20} color="#fff" />
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* Guardar */}
@@ -251,6 +342,13 @@ function makeStyles(c: ReturnType<typeof import('@/lib/theme').useAppColors>) {
       paddingVertical: 6,
     },
     switchLabel: { fontSize: 15, color: c.textSecondary },
+
+    pmRow:       { flexDirection: 'row', alignItems: 'center', paddingVertical: 8, gap: 12, borderBottomWidth: 1, borderBottomColor: c.background },
+    pmLabel:     { fontSize: 15, fontWeight: '500' },
+    pmCredit:    { fontSize: 11, marginTop: 2 },
+    pmAddRow:    { paddingTop: 12, borderTopWidth: 1, gap: 8, marginTop: 4 },
+    pmCreditRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
+    pmAddBtn:    { width: 40, height: 40, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
 
     saveBtn: {
       flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
