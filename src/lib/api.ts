@@ -98,8 +98,12 @@ async function request<T>(
     throw new ApiError('Sesión expirada', 401)
   }
 
+  // Los endpoints de auth manejan sus propios 401 (credenciales inválidas, etc.)
+  // No disparar el ciclo de refresh para ellos — caerán al handler de !response.ok
+  const isAuthEndpoint = path.startsWith('/api/auth/') || path.startsWith('/api/superadmin/auth/')
+
   // 401 or 307 (Next.js redirect to /login when session expired)
-  if ((response.status === 401 || response.status === 307) && !isRetry) {
+  if ((response.status === 401 || response.status === 307) && !isRetry && !isAuthEndpoint) {
     try {
       if (!inflightRefresh) {
         inflightRefresh = attemptTokenRefresh().finally(() => { inflightRefresh = null })
@@ -120,7 +124,7 @@ async function request<T>(
     }
   }
 
-  if (response.status === 401 || response.status === 307) {
+  if ((response.status === 401 || response.status === 307) && !isAuthEndpoint) {
     // Second attempt also failed with auth error → clear session and redirect
     await clearSession()
     triggerAuthFail()
