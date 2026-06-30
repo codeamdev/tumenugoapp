@@ -232,10 +232,7 @@ function PayModal({ order, onClose, onRefresh }: {
                   <TouchableOpacity
                     key={amt}
                     style={[s.quickBtn, { borderColor: PRIMARY }]}
-                    onPress={() => {
-                      const cur = parseFloat(payments[0]?.amount) || 0
-                      updateRow(0, 'amount', String(cur + amt))
-                    }}
+                    onPress={() => updateRow(0, 'amount', String(amt))}
                   >
                     <Text style={[s.quickBtnText, { color: PRIMARY }]}>+{amt >= 1000 ? `${amt / 1000}k` : amt}</Text>
                   </TouchableOpacity>
