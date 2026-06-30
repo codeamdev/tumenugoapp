@@ -104,8 +104,14 @@ function OpenModal({ visible, sign, onClose, onDone }: {
 
 // ─── Modal: Cerrar caja ───────────────────────────────────────────────────────
 
-function CloseModal({ visible, expected, sign, onClose, onDone }: {
-  visible: boolean; expected: number; sign: string; onClose: () => void; onDone: () => void
+function CloseModal({ visible, expected, sign, byPaymentMethod, labels, onClose, onDone }: {
+  visible: boolean
+  expected: number
+  sign: string
+  byPaymentMethod: Record<string, number>
+  labels: Record<string, string>
+  onClose: () => void
+  onDone: () => void
 }) {
   const { isConnected } = useNetworkStatus()
   const c = useAppColors()
@@ -145,8 +151,29 @@ function CloseModal({ visible, expected, sign, onClose, onDone }: {
           </TouchableOpacity>
         </View>
         <ScrollView contentContainerStyle={styles.modalBody}>
+
+          {/* Resumen de ventas por método de pago */}
+          {Object.keys(byPaymentMethod).length > 0 && (
+            <View style={[styles.summaryBox, { backgroundColor: c.surfaceAlt, borderColor: c.border }]}>
+              <Text style={[styles.summaryTitle, { color: c.text }]}>Resumen de ventas</Text>
+              {Object.entries(byPaymentMethod).map(([key, val]) => (
+                <View key={key} style={styles.summaryRow}>
+                  <Text style={[styles.summaryLabel, { color: c.textSecondary }]}>{labels[key] ?? key}</Text>
+                  <Text style={[styles.summaryValue, { color: c.text }]}>{formatCurrency(val, sign)}</Text>
+                </View>
+              ))}
+              <View style={[styles.summaryDivider, { borderTopColor: c.border }]} />
+              <View style={styles.summaryRow}>
+                <Text style={[styles.summaryLabel, { color: c.text, fontWeight: '700' }]}>Total ventas</Text>
+                <Text style={[styles.summaryValue, { color: c.text, fontWeight: '800' }]}>
+                  {formatCurrency(Object.values(byPaymentMethod).reduce((s, v) => s + v, 0), sign)}
+                </Text>
+              </View>
+            </View>
+          )}
+
           <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Efectivo esperado</Text>
+            <Text style={styles.infoLabel}>Efectivo esperado en caja</Text>
             <Text style={styles.infoValue}>{formatCurrency(expected, sign)}</Text>
           </View>
 
@@ -372,6 +399,8 @@ export default function CajaScreen() {
         visible={closeModal}
         expected={summary?.expectedCash ?? 0}
         sign={sign}
+        byPaymentMethod={summary?.byPaymentMethod ?? {}}
+        labels={labels}
         onClose={() => setCloseModal(false)}
         onDone={() => { setCloseModal(false); invalidate() }}
       />
@@ -460,6 +489,13 @@ function makeStyles(c: ReturnType<typeof useAppColors>) {
       padding: 12, fontSize: 16, backgroundColor: c.surfaceAlt, color: c.text,
     },
     inputMulti: { minHeight: 80, textAlignVertical: 'top' },
+
+    summaryBox:     { borderWidth: 1, borderRadius: 12, padding: 14, marginBottom: 16, gap: 6 },
+    summaryTitle:   { fontSize: 13, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 },
+    summaryRow:     { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+    summaryLabel:   { fontSize: 14 },
+    summaryValue:   { fontSize: 14 },
+    summaryDivider: { borderTopWidth: 1, marginVertical: 6 },
 
     infoRow:   { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 },
     infoLabel: { fontSize: 14, color: c.textMuted },
