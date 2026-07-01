@@ -348,7 +348,8 @@ function makePayStyles(c: ReturnType<typeof useAppColors>) {
 
 // ─── Modal: Agregar productos a pedido existente ──────────────────────────────
 
-interface ItemToAdd { productId: string; name: string; price: number; qty: number }
+interface ItemToAdd  { productId: string; name: string; price: number; qty: number }
+interface LibreItem  { id: string; name: string; price: number; qty: number }
 
 function AddItemsModal({ order, onClose, onAdded }: {
   order: Order
@@ -380,6 +381,9 @@ function AddItemsModal({ order, onClose, onAdded }: {
   const [catId,     setCatId]     = useState<string | null>(null)
   const [toAdd,     setToAdd]     = useState<Record<string, ItemToAdd>>({})
   const [submitting, setSubmitting] = useState(false)
+  const [libreItems, setLibreItems] = useState<LibreItem[]>([])
+  const [libreName,  setLibreName]  = useState('')
+  const [librePrice, setLibrePrice] = useState('')
 
   const visible = search
     ? products.filter((p) => p.name.toLowerCase().includes(search.toLowerCase()))
@@ -387,7 +391,20 @@ function AddItemsModal({ order, onClose, onAdded }: {
       ? products.filter((p) => p.categoryId === catId)
       : []
 
-  const totalItems = Object.values(toAdd).reduce((s, i) => s + i.qty, 0)
+  function addLibre() {
+    const name  = libreName.trim()
+    const price = parseFloat(librePrice)
+    if (!name || isNaN(price) || price < 0) return
+    setLibreItems((prev) => [...prev, { id: `libre-${Date.now()}`, name, price, qty: 1 }])
+    setLibreName('')
+    setLibrePrice('')
+  }
+
+  function bumpLibre(id: string, delta: number) {
+    setLibreItems((prev) =>
+      prev.map((i) => i.id === id ? { ...i, qty: Math.max(0, i.qty + delta) } : i).filter((i) => i.qty > 0)
+    )
+  }
 
   function bump(product: Product, delta: number) {
     setToAdd((prev) => {
@@ -402,14 +419,13 @@ function AddItemsModal({ order, onClose, onAdded }: {
   }
 
   async function confirm() {
-    const items = Object.values(toAdd)
-    if (items.length === 0) return
+    const catalogItems = Object.values(toAdd).map((i) => ({ productId: i.productId, quantity: i.qty, modifiers: [] }))
+    const freeItems    = libreItems.map((i) => ({ productId: null as null, customName: i.name, customPrice: i.price, quantity: i.qty, modifiers: [] }))
+    const allItems     = [...catalogItems, ...freeItems]
+    if (allItems.length === 0) return
     setSubmitting(true)
     try {
-      await api.patch(`/api/tenant/orders/${order.id}`, {
-        action: 'add_items',
-        items: items.map((i) => ({ productId: i.productId, quantity: i.qty, modifiers: [] })),
-      })
+      await api.patch(`/api/tenant/orders/${order.id}`, { action: 'add_items', items: allItems })
       onAdded()
       onClose()
     } catch (err: any) {
@@ -419,6 +435,7 @@ function AddItemsModal({ order, onClose, onAdded }: {
     }
   }
 
+  const totalItems     = Object.values(toAdd).reduce((s, i) => s + i.qty, 0) + libreItems.reduce((s, i) => s + i.qty, 0)
   const showingProducts = search.length > 0 || catId !== null
 
   return (
@@ -514,6 +531,56 @@ function AddItemsModal({ order, onClose, onAdded }: {
           </>
         )}
 
+        {/* Producto libre */}
+        <View style={[ai.libreSection, { borderTopColor: c.border, backgroundColor: c.surface }]}>
+          <Text style={[ai.libreTitle, { color: c.textSecondary }]}>Producto libre</Text>
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            <TextInput
+              style={[ai.libreInput, { flex: 2, color: c.text, borderColor: c.border, backgroundColor: c.surfaceAlt }]}
+              placeholder="Nombre"
+              placeholderTextColor={c.textMuted}
+              value={libreName}
+              onChangeText={setLibreName}
+            />
+            <TextInput
+              style={[ai.libreInput, { flex: 1, color: c.text, borderColor: c.border, backgroundColor: c.surfaceAlt }]}
+              placeholder="Precio"
+              placeholderTextColor={c.textMuted}
+              value={librePrice}
+              onChangeText={setLibrePrice}
+              keyboardType="numeric"
+            />
+            <TouchableOpacity
+              style={[ai.libreAddBtn, { backgroundColor: libreName.trim() && librePrice ? PRIMARY : c.border }]}
+              onPress={addLibre}
+              disabled={!libreName.trim() || !librePrice}
+            >
+              <Ionicons name="add" size={20} color="#fff" />
+            </TouchableOpacity>
+          </View>
+          {libreItems.length > 0 && (
+            <View style={{ gap: 4, marginTop: 8 }}>
+              {libreItems.map((item) => (
+                <View key={item.id} style={[ai.libreItem, { borderColor: c.border }]}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ color: c.text, fontSize: 13, fontWeight: '600' }}>{item.name}</Text>
+                    <Text style={{ color: PRIMARY, fontSize: 12 }}>{formatCurrency(item.price, sign)}</Text>
+                  </View>
+                  <View style={ai.qtyCtrl}>
+                    <TouchableOpacity style={[ai.qtyBtn, { borderColor: PRIMARY }]} onPress={() => bumpLibre(item.id, -1)}>
+                      <Ionicons name="remove" size={14} color={PRIMARY} />
+                    </TouchableOpacity>
+                    <Text style={[ai.qtyNum, { color: PRIMARY }]}>{item.qty}</Text>
+                    <TouchableOpacity style={[ai.qtyBtn, { borderColor: PRIMARY }]} onPress={() => bumpLibre(item.id, 1)}>
+                      <Ionicons name="add" size={14} color={PRIMARY} />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              ))}
+            </View>
+          )}
+        </View>
+
         {/* Botón confirmar */}
         {totalItems > 0 && (
           <View style={[ai.footer, { borderTopColor: c.border }]}>
@@ -556,6 +623,11 @@ const ai = StyleSheet.create({
   footer:      { padding: 16, borderTopWidth: 1 },
   confirmBtn:  { borderRadius: 12, padding: 15, alignItems: 'center' },
   confirmText: { color: '#fff', fontWeight: '700', fontSize: 15 },
+  libreSection: { borderTopWidth: 1, padding: 12, gap: 6 },
+  libreTitle:   { fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 },
+  libreInput:   { borderWidth: 1, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 8, fontSize: 14 },
+  libreAddBtn:  { width: 40, height: 40, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
+  libreItem:    { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderRadius: 8, padding: 8, gap: 8 },
 })
 
 // ─── Modal detalle ────────────────────────────────────────────────────────────
