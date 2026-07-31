@@ -262,6 +262,7 @@ function ProductRow({ product, onPress, PRIMARY, sign, c }: {
   c: ReturnType<typeof useAppColors>
 }) {
   const hasModifiers = (product.modifierGroups?.length ?? 0) > 0
+  const hasFlavors   = (product.flavors?.length ?? 0) > 0
   return (
     <TouchableOpacity
       style={[rStyles.row, { borderBottomColor: c.border }]}
@@ -270,7 +271,8 @@ function ProductRow({ product, onPress, PRIMARY, sign, c }: {
     >
       <View style={{ flex: 1 }}>
         <Text style={[rStyles.name, { color: c.text }]} numberOfLines={1}>{product.name}</Text>
-        {hasModifiers && <Text style={[rStyles.sub, { color: c.textMuted }]}>Personalizable</Text>}
+        {hasFlavors   && <Text style={[rStyles.sub, { color: c.textMuted }]}>Con sabores</Text>}
+        {!hasFlavors && hasModifiers && <Text style={[rStyles.sub, { color: c.textMuted }]}>Personalizable</Text>}
       </View>
       <Text style={[rStyles.price, { color: PRIMARY }]}>{formatCurrency(parseFloat(product.price), sign)}</Text>
       <View style={[rStyles.addBtn, { backgroundColor: PRIMARY + '18' }]}>
@@ -311,6 +313,109 @@ const catStyles = StyleSheet.create({
   card:  { flex: 1, margin: 5, borderRadius: 14, padding: 16, alignItems: 'center', gap: 8, shadowOpacity: 0.05, shadowRadius: 6, elevation: 2 },
   emoji: { fontSize: 32 },
   name:  { fontSize: 13, fontWeight: '600', textAlign: 'center' },
+})
+
+// ─── Modal: Sabores ───────────────────────────────────────────────────────────
+
+function FlavorModal({ product, onAdd, onClose, PRIMARY, sign, c }: {
+  product: Product
+  onAdd: (flavor: string, qty: number) => void
+  onClose: () => void
+  PRIMARY: string
+  sign: string
+  c: ReturnType<typeof useAppColors>
+}) {
+  const [selected, setSelected] = useState<string | null>(null)
+  const [qty, setQty] = useState(1)
+  const price = parseFloat(product.price)
+
+  return (
+    <Modal visible animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
+      <SafeAreaView style={[flStyles.root, { backgroundColor: c.surface }]}>
+        <View style={[flStyles.header, { borderBottomColor: c.border }]}>
+          <TouchableOpacity onPress={onClose}>
+            <Ionicons name="close" size={24} color={c.textSecondary} />
+          </TouchableOpacity>
+          <Text style={[flStyles.title, { color: c.text }]} numberOfLines={1}>{product.name}</Text>
+          <View style={{ width: 24 }} />
+        </View>
+
+        <ScrollView contentContainerStyle={flStyles.body}>
+          <Text style={[flStyles.sectionLabel, { color: c.text }]}>Elige el sabor</Text>
+          <View style={flStyles.chipsWrap}>
+            {product.flavors.map((fl) => {
+              const sel = fl === selected
+              return (
+                <TouchableOpacity
+                  key={fl}
+                  style={[flStyles.chip, { borderColor: sel ? PRIMARY : c.border, backgroundColor: sel ? PRIMARY : c.surfaceAlt }]}
+                  onPress={() => setSelected(fl)}
+                >
+                  <Text style={[flStyles.chipText, { color: sel ? '#fff' : c.textSecondary }]}>{fl}</Text>
+                </TouchableOpacity>
+              )
+            })}
+          </View>
+
+          <View style={flStyles.qtySection}>
+            <Text style={[flStyles.sectionLabel, { color: c.text }]}>Cantidad</Text>
+            <View style={flStyles.qtyRow}>
+              <TouchableOpacity style={[flStyles.qtyBtn, { borderColor: PRIMARY }]} onPress={() => setQty((q) => Math.max(1, q - 1))}>
+                <Ionicons name="remove" size={18} color={PRIMARY} />
+              </TouchableOpacity>
+              <Text style={[flStyles.qtyNum, { color: c.text }]}>{qty}</Text>
+              <TouchableOpacity style={[flStyles.qtyBtn, { borderColor: PRIMARY }]} onPress={() => setQty((q) => q + 1)}>
+                <Ionicons name="add" size={18} color={PRIMARY} />
+              </TouchableOpacity>
+            </View>
+          </View>
+        </ScrollView>
+
+        <View style={[flStyles.footer, { borderTopColor: c.border }]}>
+          <TouchableOpacity
+            style={[flStyles.addBtn, { backgroundColor: PRIMARY }, !selected && flStyles.addBtnDisabled]}
+            disabled={!selected}
+            onPress={() => { onAdd(selected!, qty) }}
+          >
+            <Text style={flStyles.addBtnText}>
+              Agregar · {formatCurrency(price * qty, sign)}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    </Modal>
+  )
+}
+
+const flStyles = StyleSheet.create({
+  root:   { flex: 1 },
+  header: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: 20, paddingVertical: 16, borderBottomWidth: 1,
+  },
+  title:  { fontSize: 16, fontWeight: '700', flex: 1, textAlign: 'center' },
+  body:   { padding: 24, gap: 24 },
+  footer: { padding: 20, borderTopWidth: 1 },
+
+  sectionLabel: { fontSize: 15, fontWeight: '700', marginBottom: 12 },
+  chipsWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  chip: {
+    paddingHorizontal: 18, paddingVertical: 10,
+    borderRadius: 24, borderWidth: 1.5,
+  },
+  chipText: { fontSize: 15, fontWeight: '600' },
+
+  qtySection: { gap: 12 },
+  qtyRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 24 },
+  qtyBtn: {
+    width: 44, height: 44, borderRadius: 22,
+    borderWidth: 1.5, alignItems: 'center', justifyContent: 'center',
+  },
+  qtyNum: { fontSize: 28, fontWeight: '800', minWidth: 40, textAlign: 'center' },
+
+  addBtn:         { borderRadius: 14, padding: 16, alignItems: 'center' },
+  addBtnText:     { color: '#fff', fontWeight: '700', fontSize: 16 },
+  addBtnDisabled: { opacity: 0.4 },
 })
 
 // ─── Sheet de cantidad ────────────────────────────────────────────────────────
@@ -814,6 +919,7 @@ export default function PosScreen() {
   const [cartOpen,      setCartOpen]      = useState(false)
   const [freeOpen,      setFreeOpen]      = useState(false)
   const [modProduct,    setModProduct]    = useState<Product | null>(null)
+  const [flavorProduct, setFlavorProduct] = useState<Product | null>(null)
 
   const isSearchMode = search.length > 0
 
@@ -841,11 +947,27 @@ export default function PosScreen() {
   }, [products, categories])
 
   function handleProductTap(product: Product) {
-    if ((product.modifierGroups?.length ?? 0) > 0) {
+    if ((product.flavors?.length ?? 0) > 0) {
+      setFlavorProduct(product)
+    } else if ((product.modifierGroups?.length ?? 0) > 0) {
       setModProduct(product)
     } else {
       setSheetProduct(product)
     }
+  }
+
+  function handleFlavorAdd(product: Product, flavor: string, qty: number) {
+    addItem({
+      productId: product.id,
+      name: product.name,
+      unitPrice: parseFloat(product.price),
+      quantity: qty,
+      modifiers: [],
+      notes: `Sabor: ${flavor}`,
+    })
+    setFlavorProduct(null)
+    setCategoryId(null)
+    clearSearch()
   }
 
   function handleSheetAdd(qty: number) {
@@ -1013,6 +1135,17 @@ export default function PosScreen() {
           product={modProduct}
           onAdd={(opts) => handleModAdd(modProduct, opts)}
           onClose={() => setModProduct(null)}
+        />
+      )}
+
+      {flavorProduct && (
+        <FlavorModal
+          product={flavorProduct}
+          PRIMARY={PRIMARY}
+          sign={sign}
+          c={c}
+          onAdd={(flavor, qty) => handleFlavorAdd(flavorProduct, flavor, qty)}
+          onClose={() => setFlavorProduct(null)}
         />
       )}
     </View>

@@ -106,6 +106,7 @@ export interface Product {
   taxRateId: string | null
   prepTimeMin: number | null
   sortOrder: number
+  flavors: string[]
   modifierGroups: ModifierGroup[]
 }
 

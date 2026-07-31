@@ -80,9 +80,10 @@ export default function ProductosScreen() {
   // Modal state
   const [showNewProd, setShowNewProd] = useState(false)
   const [showNewCat,  setShowNewCat]  = useState(false)
-  const [prodForm, setProdForm] = useState({ name: '', price: '', categoryId: '', isAvailable: true })
+  const [prodForm, setProdForm] = useState({ name: '', price: '', categoryId: '', isAvailable: true, flavors: [] as string[] })
   const [catForm,  setCatForm]  = useState({ name: '', emoji: '' })
   const [creating, setCreating] = useState(false)
+  const [newFlavor, setNewFlavor] = useState('')
 
   useEffect(() => {
     if (user && !['admin', 'cajero'].includes(user.role)) router.back()
@@ -126,11 +127,13 @@ export default function ProductosScreen() {
         price:       priceNum.toFixed(2),
         categoryId:  prodForm.categoryId,
         isAvailable: prodForm.isAvailable,
+        flavors:     prodForm.flavors,
       })
       qc.invalidateQueries({ queryKey: ['products-mgmt'] })
       qc.invalidateQueries({ queryKey: ['products'] })
       setShowNewProd(false)
-      setProdForm({ name: '', price: '', categoryId: '', isAvailable: true })
+      setProdForm({ name: '', price: '', categoryId: '', isAvailable: true, flavors: [] })
+      setNewFlavor('')
       Alert.alert('Creado', 'Producto creado correctamente.')
     } catch (err: any) {
       Alert.alert('Error', err.message ?? 'No se pudo crear el producto')
@@ -318,6 +321,55 @@ export default function ProductosScreen() {
                   thumbColor={prodForm.isAvailable ? PRIMARY : c.textMuted}
                 />
               </View>
+
+              {/* Sabores */}
+              <Text style={[s.fieldLabel, { color: c.textSecondary, marginTop: 20 }]}>Sabores (opcional)</Text>
+              <Text style={{ fontSize: 12, color: c.textMuted, marginBottom: 8 }}>
+                Si este producto tiene sabores, agrégalos aquí. Se pedirá al cajero elegir uno.
+              </Text>
+              <View style={{ flexDirection: 'row', gap: 8 }}>
+                <TextInput
+                  style={[s.fieldInput, { color: c.text, borderColor: c.border, backgroundColor: c.surfaceAlt, flex: 1 }]}
+                  placeholder="Ej: Fresa"
+                  placeholderTextColor={c.textMuted}
+                  value={newFlavor}
+                  onChangeText={setNewFlavor}
+                  onSubmitEditing={() => {
+                    const t = newFlavor.trim()
+                    if (t && !prodForm.flavors.includes(t)) {
+                      setProdForm((f) => ({ ...f, flavors: [...f.flavors, t] }))
+                      setNewFlavor('')
+                    }
+                  }}
+                  returnKeyType="done"
+                />
+                <TouchableOpacity
+                  style={[s.saveBtn, { backgroundColor: PRIMARY, paddingHorizontal: 16, paddingVertical: 10, marginTop: 0 }]}
+                  onPress={() => {
+                    const t = newFlavor.trim()
+                    if (t && !prodForm.flavors.includes(t)) {
+                      setProdForm((f) => ({ ...f, flavors: [...f.flavors, t] }))
+                      setNewFlavor('')
+                    }
+                  }}
+                >
+                  <Ionicons name="add" size={18} color="#fff" />
+                </TouchableOpacity>
+              </View>
+              {prodForm.flavors.length > 0 && (
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 10 }}>
+                  {prodForm.flavors.map((fl) => (
+                    <TouchableOpacity
+                      key={fl}
+                      style={[s.catChip, { borderColor: PRIMARY, backgroundColor: PRIMARY + '18', flexDirection: 'row', alignItems: 'center', gap: 4 }]}
+                      onPress={() => setProdForm((f) => ({ ...f, flavors: f.flavors.filter((x) => x !== fl) }))}
+                    >
+                      <Text style={[s.catChipText, { color: PRIMARY }]}>{fl}</Text>
+                      <Ionicons name="close" size={12} color={PRIMARY} />
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
 
               <TouchableOpacity
                 style={[s.saveBtn, { backgroundColor: PRIMARY, marginTop: 24 }, creating && { opacity: 0.6 }]}
