@@ -56,6 +56,7 @@ function ProductRow({ product, categories, primary, sign, onToggle, onEdit, c }:
         <Text style={s.productSub}>
           {cat ? `${cat.emoji ? cat.emoji + ' ' : ''}${cat.name}` : 'Sin categoría'}
           {'  ·  '}{formatCurrency(parseFloat(product.price), sign)}
+          {(product.flavors?.length ?? 0) > 0 ? `  ·  ${product.flavors.length} sabor${product.flavors.length > 1 ? 'es' : ''}` : ''}
         </Text>
       </View>
       <TouchableOpacity onPress={() => onEdit(product)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} style={{ marginRight: 8 }}>
