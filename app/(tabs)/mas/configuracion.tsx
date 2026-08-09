@@ -21,9 +21,13 @@ interface RemoteConfig {
   name: string
   primaryColor: string | null
   currencySign: string | null
+  timezone: string | null
+  taxConfig: { defaultRate: number; includesIVA: boolean; includesINC: boolean } | null
   posConfig: {
     deliveryFields: { phone: boolean; address: boolean; notes: boolean; fee: boolean }
     paymentMethods?: PaymentMethod[]
+    defaultOpeningAmount?: number
+    defaultDeliveryFee?: number
   } | null
 }
 
@@ -44,14 +48,20 @@ export default function ConfiguracionScreen() {
   const c = useAppColors()
   const styles = makeStyles(c)
 
-  const [saving, setSaving]           = useState(false)
-  const [name, setName]               = useState('')
-  const [color, setColor]             = useState(PRIMARY)
-  const [currency, setCurrency]       = useState('$')
-  const [delivery, setDelivery]       = useState({ phone: true, address: true, notes: true, fee: true })
-  const [payMethods, setPayMethods]   = useState<PaymentMethod[]>(DEFAULT_PAYMENT_METHODS)
-  const [newMethodLabel, setNewLabel] = useState('')
-  const [newMethodCredit, setNewCredit] = useState(false)
+  const [saving, setSaving]               = useState(false)
+  const [name, setName]                   = useState('')
+  const [color, setColor]                 = useState(PRIMARY)
+  const [currency, setCurrency]           = useState('$')
+  const [timezone, setTimezone]           = useState('America/Bogota')
+  const [taxRate, setTaxRate]             = useState('0')
+  const [taxIVA, setTaxIVA]               = useState(false)
+  const [taxINC, setTaxINC]               = useState(false)
+  const [defaultOpening, setDefaultOpening] = useState('')
+  const [defaultFee, setDefaultFee]       = useState('')
+  const [delivery, setDelivery]           = useState({ phone: true, address: true, notes: true, fee: true })
+  const [payMethods, setPayMethods]       = useState<PaymentMethod[]>(DEFAULT_PAYMENT_METHODS)
+  const [newMethodLabel, setNewLabel]     = useState('')
+  const [newMethodCredit, setNewCredit]   = useState(false)
 
   useEffect(() => {
     if (!user) return
@@ -74,10 +84,17 @@ export default function ConfiguracionScreen() {
     setName(configData.name ?? '')
     setColor(configData.primaryColor ?? '#2563eb')
     setCurrency(configData.currencySign ?? '$')
-    const df = configData.posConfig?.deliveryFields
-    if (df) setDelivery({ phone: df.phone, address: df.address, notes: df.notes, fee: df.fee })
-    const pm = configData.posConfig?.paymentMethods
-    if (pm && pm.length > 0) setPayMethods(pm)
+    if (configData.timezone) setTimezone(configData.timezone)
+    if (configData.taxConfig) {
+      setTaxRate(String(configData.taxConfig.defaultRate ?? 0))
+      setTaxIVA(configData.taxConfig.includesIVA ?? false)
+      setTaxINC(configData.taxConfig.includesINC ?? false)
+    }
+    const pc = configData.posConfig
+    if (pc?.deliveryFields) setDelivery({ phone: pc.deliveryFields.phone, address: pc.deliveryFields.address, notes: pc.deliveryFields.notes, fee: pc.deliveryFields.fee })
+    if (pc?.paymentMethods && pc.paymentMethods.length > 0) setPayMethods(pc.paymentMethods)
+    if (pc?.defaultOpeningAmount != null) setDefaultOpening(String(pc.defaultOpeningAmount))
+    if (pc?.defaultDeliveryFee != null) setDefaultFee(String(pc.defaultDeliveryFee))
   }, [configData])
 
   async function handleSave() {
@@ -92,7 +109,18 @@ export default function ConfiguracionScreen() {
         name: name.trim(),
         primaryColor: color,
         currencySign: currency.trim() || '$',
-        posConfig: { deliveryFields: delivery, paymentMethods: payMethods },
+        timezone: timezone.trim() || 'America/Bogota',
+        taxConfig: {
+          defaultRate: parseFloat(taxRate) || 0,
+          includesIVA: taxIVA,
+          includesINC: taxINC,
+        },
+        posConfig: {
+          deliveryFields: delivery,
+          paymentMethods: payMethods,
+          ...(defaultOpening.trim() ? { defaultOpeningAmount: parseFloat(defaultOpening) } : {}),
+          ...(defaultFee.trim() ? { defaultDeliveryFee: parseFloat(defaultFee) } : {}),
+        },
       })
       qc.invalidateQueries({ queryKey: ['configuracion'] })
       Alert.alert('Guardado', 'La configuración fue actualizada correctamente.')
@@ -168,6 +196,81 @@ export default function ConfiguracionScreen() {
             maxLength={5}
             editable={isConnected}
           />
+        </View>
+
+        {/* Impuestos */}
+        <View style={styles.card}>
+          <Text style={styles.sectionTitle}>Impuestos</Text>
+          <Text style={styles.label}>Tasa por defecto (%)</Text>
+          <TextInput
+            style={[styles.input, { width: 100 }]}
+            value={taxRate}
+            onChangeText={setTaxRate}
+            placeholder="0"
+            placeholderTextColor={c.textMuted}
+            keyboardType="numeric"
+            editable={isConnected}
+          />
+          <View style={styles.switchRow}>
+            <Text style={styles.switchLabel}>Incluye IVA</Text>
+            <Switch
+              value={taxIVA}
+              onValueChange={(v) => { if (isConnected) setTaxIVA(v) }}
+              disabled={!isConnected}
+              trackColor={{ false: c.border, true: PRIMARY + '88' }}
+              thumbColor={taxIVA ? PRIMARY : c.textMuted}
+            />
+          </View>
+          <View style={styles.switchRow}>
+            <Text style={styles.switchLabel}>Incluye INC</Text>
+            <Switch
+              value={taxINC}
+              onValueChange={(v) => { if (isConnected) setTaxINC(v) }}
+              disabled={!isConnected}
+              trackColor={{ false: c.border, true: PRIMARY + '88' }}
+              thumbColor={taxINC ? PRIMARY : c.textMuted}
+            />
+          </View>
+        </View>
+
+        {/* Montos por defecto */}
+        <View style={styles.card}>
+          <Text style={styles.sectionTitle}>Montos por defecto</Text>
+          <Text style={styles.label}>Base de caja (apertura)</Text>
+          <TextInput
+            style={styles.input}
+            value={defaultOpening}
+            onChangeText={setDefaultOpening}
+            placeholder="Ej: 50000"
+            placeholderTextColor={c.textMuted}
+            keyboardType="numeric"
+            editable={isConnected}
+          />
+          <Text style={[styles.label, { marginTop: 10 }]}>Costo de envío por defecto</Text>
+          <TextInput
+            style={styles.input}
+            value={defaultFee}
+            onChangeText={setDefaultFee}
+            placeholder="Ej: 5000"
+            placeholderTextColor={c.textMuted}
+            keyboardType="numeric"
+            editable={isConnected}
+          />
+        </View>
+
+        {/* Zona horaria */}
+        <View style={styles.card}>
+          <Text style={styles.sectionTitle}>Zona horaria</Text>
+          <TextInput
+            style={styles.input}
+            value={timezone}
+            onChangeText={setTimezone}
+            placeholder="America/Bogota"
+            placeholderTextColor={c.textMuted}
+            autoCapitalize="none"
+            editable={isConnected}
+          />
+          <Text style={styles.hint}>Ej: America/Bogota, America/Lima, America/Mexico_City</Text>
         </View>
 
         {/* Color primario */}
