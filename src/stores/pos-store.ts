@@ -47,7 +47,11 @@ export const usePosStore = create<PosState>((set, get) => ({
     set((s) => {
       const noMods = item.modifiers.length === 0
       const existing = noMods
-        ? s.items.find((i) => i.productId === item.productId && i.modifiers.length === 0)
+        ? s.items.find((i) =>
+            i.productId === item.productId &&
+            i.modifiers.length === 0 &&
+            (i.notes ?? '') === (item.notes ?? '')
+          )
         : null
       const items = existing
         ? s.items.map((i) => i.localId === existing.localId ? { ...i, quantity: i.quantity + item.quantity } : i)

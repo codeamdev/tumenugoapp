@@ -1,3 +1,4 @@
+'use client'
 import { useState, useEffect } from 'react'
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
@@ -13,16 +14,9 @@ import { useNetworkStatus } from '@/hooks/use-network'
 import { useAppColors } from '@/lib/theme'
 import { ErrorView } from '@/components/ErrorView'
 
-const PRESET_COLORS = ['#1F3D30', '#C6E06A', '#2563eb', '#16a34a', '#dc2626', '#9333ea', '#ea580c', '#0891b2']
-
 interface PaymentMethod { key: string; label: string; isCredit?: boolean }
 
 interface RemoteConfig {
-  name: string
-  primaryColor: string | null
-  currencySign: string | null
-  timezone: string | null
-  taxConfig: { defaultRate: number; includesIVA: boolean; includesINC: boolean } | null
   posConfig: {
     deliveryFields: { phone: boolean; address: boolean; notes: boolean; fee: boolean }
     paymentMethods?: PaymentMethod[]
@@ -49,13 +43,6 @@ export default function ConfiguracionScreen() {
   const styles = makeStyles(c)
 
   const [saving, setSaving]               = useState(false)
-  const [name, setName]                   = useState('')
-  const [color, setColor]                 = useState(PRIMARY)
-  const [currency, setCurrency]           = useState('$')
-  const [timezone, setTimezone]           = useState('America/Bogota')
-  const [taxRate, setTaxRate]             = useState('0')
-  const [taxIVA, setTaxIVA]               = useState(false)
-  const [taxINC, setTaxINC]               = useState(false)
   const [defaultOpening, setDefaultOpening] = useState('')
   const [defaultFee, setDefaultFee]       = useState('')
   const [delivery, setDelivery]           = useState({ phone: true, address: true, notes: true, fee: true })
@@ -78,18 +65,8 @@ export default function ConfiguracionScreen() {
     enabled: user?.role === 'admin',
   })
 
-  // Initialize form state when data arrives (or from cache)
   useEffect(() => {
     if (!configData) return
-    setName(configData.name ?? '')
-    setColor(configData.primaryColor ?? '#2563eb')
-    setCurrency(configData.currencySign ?? '$')
-    if (configData.timezone) setTimezone(configData.timezone)
-    if (configData.taxConfig) {
-      setTaxRate(String(configData.taxConfig.defaultRate ?? 0))
-      setTaxIVA(configData.taxConfig.includesIVA ?? false)
-      setTaxINC(configData.taxConfig.includesINC ?? false)
-    }
     const pc = configData.posConfig
     if (pc?.deliveryFields) setDelivery({ phone: pc.deliveryFields.phone, address: pc.deliveryFields.address, notes: pc.deliveryFields.notes, fee: pc.deliveryFields.fee })
     if (pc?.paymentMethods && pc.paymentMethods.length > 0) setPayMethods(pc.paymentMethods)
@@ -102,19 +79,9 @@ export default function ConfiguracionScreen() {
       Alert.alert('Sin conexión', 'Los cambios de configuración requieren conexión a internet.')
       return
     }
-    if (!name.trim()) { Alert.alert('Error', 'El nombre no puede estar vacío'); return }
     setSaving(true)
     try {
       await api.patch('/api/tenant/configuracion', {
-        name: name.trim(),
-        primaryColor: color,
-        currencySign: currency.trim() || '$',
-        timezone: timezone.trim() || 'America/Bogota',
-        taxConfig: {
-          defaultRate: parseFloat(taxRate) || 0,
-          includesIVA: taxIVA,
-          includesINC: taxINC,
-        },
         posConfig: {
           deliveryFields: delivery,
           paymentMethods: payMethods,
@@ -148,8 +115,6 @@ export default function ConfiguracionScreen() {
     setPayMethods((prev) => prev.filter((m) => m.key !== key))
   }
 
-  const isValidColor = /^#[0-9a-fA-F]{6}$/.test(color)
-
   if (isLoading) {
     return (
       <SafeAreaView style={styles.root}>
@@ -171,67 +136,6 @@ export default function ConfiguracionScreen() {
         </View>
       )}
       <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
-
-        {/* Información general */}
-        <View style={styles.card}>
-          <Text style={styles.sectionTitle}>Información general</Text>
-
-          <Text style={styles.label}>Nombre del negocio</Text>
-          <TextInput
-            style={styles.input}
-            value={name}
-            onChangeText={setName}
-            placeholder="Nombre del negocio"
-            placeholderTextColor={c.textMuted}
-            editable={isConnected}
-          />
-
-          <Text style={styles.label}>Signo de moneda</Text>
-          <TextInput
-            style={[styles.input, { width: 80 }]}
-            value={currency}
-            onChangeText={setCurrency}
-            placeholder="$"
-            placeholderTextColor={c.textMuted}
-            maxLength={5}
-            editable={isConnected}
-          />
-        </View>
-
-        {/* Impuestos */}
-        <View style={styles.card}>
-          <Text style={styles.sectionTitle}>Impuestos</Text>
-          <Text style={styles.label}>Tasa por defecto (%)</Text>
-          <TextInput
-            style={[styles.input, { width: 100 }]}
-            value={taxRate}
-            onChangeText={setTaxRate}
-            placeholder="0"
-            placeholderTextColor={c.textMuted}
-            keyboardType="numeric"
-            editable={isConnected}
-          />
-          <View style={styles.switchRow}>
-            <Text style={styles.switchLabel}>Incluye IVA</Text>
-            <Switch
-              value={taxIVA}
-              onValueChange={(v) => { if (isConnected) setTaxIVA(v) }}
-              disabled={!isConnected}
-              trackColor={{ false: c.border, true: PRIMARY + '88' }}
-              thumbColor={taxIVA ? PRIMARY : c.textMuted}
-            />
-          </View>
-          <View style={styles.switchRow}>
-            <Text style={styles.switchLabel}>Incluye INC</Text>
-            <Switch
-              value={taxINC}
-              onValueChange={(v) => { if (isConnected) setTaxINC(v) }}
-              disabled={!isConnected}
-              trackColor={{ false: c.border, true: PRIMARY + '88' }}
-              thumbColor={taxINC ? PRIMARY : c.textMuted}
-            />
-          </View>
-        </View>
 
         {/* Montos por defecto */}
         <View style={styles.card}>
@@ -256,54 +160,6 @@ export default function ConfiguracionScreen() {
             keyboardType="numeric"
             editable={isConnected}
           />
-        </View>
-
-        {/* Zona horaria */}
-        <View style={styles.card}>
-          <Text style={styles.sectionTitle}>Zona horaria</Text>
-          <TextInput
-            style={styles.input}
-            value={timezone}
-            onChangeText={setTimezone}
-            placeholder="America/Bogota"
-            placeholderTextColor={c.textMuted}
-            autoCapitalize="none"
-            editable={isConnected}
-          />
-          <Text style={styles.hint}>Ej: America/Bogota, America/Lima, America/Mexico_City</Text>
-        </View>
-
-        {/* Color primario */}
-        <View style={styles.card}>
-          <Text style={styles.sectionTitle}>Color primario</Text>
-          <View style={styles.colorRow}>
-            {PRESET_COLORS.map((pc) => (
-              <TouchableOpacity
-                key={pc}
-                style={[styles.colorChip, { backgroundColor: pc }, color === pc && styles.colorChipActive]}
-                onPress={isConnected ? () => setColor(pc) : undefined}
-                disabled={!isConnected}
-              />
-            ))}
-          </View>
-          <TextInput
-            style={[styles.input, { marginTop: 12 }]}
-            value={color}
-            onChangeText={(v) => { if (/^#[0-9a-fA-F]{0,6}$/.test(v)) setColor(v) }}
-            placeholder="#2563eb"
-            placeholderTextColor={c.textMuted}
-            autoCapitalize="none"
-            editable={isConnected}
-          />
-          {isValidColor ? (
-            <View style={[styles.colorPreview, { backgroundColor: color }]}>
-              <Text style={styles.colorPreviewText}>{color}</Text>
-            </View>
-          ) : (
-            <View style={[styles.colorPreview, { backgroundColor: c.surfaceAlt, borderWidth: 1, borderColor: c.border }]}>
-              <Text style={[styles.colorPreviewText, { color: c.textMuted }]}>Ingresa un color válido (#RRGGBB)</Text>
-            </View>
-          )}
         </View>
 
         {/* Campos de domicilio */}
@@ -428,17 +284,6 @@ function makeStyles(c: ReturnType<typeof import('@/lib/theme').useAppColors>) {
       paddingHorizontal: 12, paddingVertical: 10,
       fontSize: 15, color: c.text, backgroundColor: c.surfaceAlt,
     },
-
-    colorRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-    colorChip: {
-      width: 36, height: 36, borderRadius: 18,
-      borderWidth: 2, borderColor: 'transparent',
-    },
-    colorChipActive: { borderColor: c.text },
-    colorPreview: {
-      height: 44, borderRadius: 10, alignItems: 'center', justifyContent: 'center', marginTop: 4,
-    },
-    colorPreviewText: { color: '#fff', fontWeight: '700', fontSize: 13 },
 
     switchRow: {
       flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',

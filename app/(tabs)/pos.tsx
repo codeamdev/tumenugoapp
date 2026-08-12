@@ -265,7 +265,7 @@ function ProductRow({ product, onPress, PRIMARY, sign, c }: {
   const hasFlavors   = (product.flavors?.length ?? 0) > 0
   return (
     <TouchableOpacity
-      style={[rStyles.row, { borderBottomColor: c.border }]}
+      style={[rStyles.row, { borderBottomColor: c.border, backgroundColor: c.surface }]}
       onPress={onPress}
       activeOpacity={0.7}
     >
