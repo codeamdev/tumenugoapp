@@ -17,13 +17,14 @@
       "bundleIdentifier": "com.cafeteriaos.mobile",
       "buildNumber": "1"
     },
+    "icon": "./assets/icon.png",
     "android": {
       "package": "com.cafeteriaos.mobile",
       "versionCode": 1,
       "softwareKeyboardLayoutMode": "pan",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#2563eb"
+        "backgroundColor": "#1F3D30"
       }
     },
     "plugins": [
