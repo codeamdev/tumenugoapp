@@ -275,19 +275,31 @@ function SimpleQtyPicker({ product, onAdd, onClose }: {
 function ProdRow({ product, onPress }: { product: Product; onPress: () => void }) {
   const c = useAppColors()
   const { tenant } = useAuthStore()
-  const PRIMARY = tenant?.primaryColor ?? '#2563eb'
-  const sign    = tenant?.currencySign ?? '$'
+  const PRIMARY    = tenant?.primaryColor ?? '#2563eb'
+  const sign       = tenant?.currencySign ?? '$'
+  const outOfStock = product.inStock === false
   const hasFlavors = (product.flavors?.length ?? 0) > 0
   const hasMods    = (product.modifierGroups?.length ?? 0) > 0
 
   return (
-    <TouchableOpacity style={[s.prodRow, { borderBottomColor: c.border, backgroundColor: c.surface }]} onPress={onPress} activeOpacity={0.7}>
+    <TouchableOpacity
+      style={[s.prodRow, { borderBottomColor: c.border, backgroundColor: c.surface }, outOfStock && { opacity: 0.55 }]}
+      onPress={outOfStock ? undefined : onPress}
+      activeOpacity={outOfStock ? 1 : 0.7}
+      disabled={outOfStock}
+    >
       <View style={{ flex: 1 }}>
-        <Text style={[s.prodName, { color: c.text }]} numberOfLines={1}>{product.name}</Text>
-        {hasFlavors && <Text style={[s.prodSub, { color: c.textMuted }]}>Con sabores</Text>}
-        {!hasFlavors && hasMods && <Text style={[s.prodSub, { color: c.textMuted }]}>Personalizable</Text>}
+        <Text style={[s.prodName, { color: outOfStock ? c.textMuted : c.text }]} numberOfLines={1}>{product.name}</Text>
+        {outOfStock
+          ? <Text style={{ fontSize: 11, fontWeight: '700', color: '#ef4444', marginTop: 2 }}>Agotado</Text>
+          : hasFlavors
+            ? <Text style={[s.prodSub, { color: c.textMuted }]}>Con sabores</Text>
+            : hasMods
+              ? <Text style={[s.prodSub, { color: c.textMuted }]}>Personalizable</Text>
+              : null
+        }
       </View>
-      <Text style={[s.prodPrice, { color: PRIMARY }]}>{formatCurrency(parseFloat(product.price), sign)}</Text>
+      {!outOfStock && <Text style={[s.prodPrice, { color: PRIMARY }]}>{formatCurrency(parseFloat(product.price), sign)}</Text>}
       <View style={[s.prodAddIcon, { backgroundColor: PRIMARY + '18' }]}>
         <Ionicons name="add" size={20} color={PRIMARY} />
       </View>

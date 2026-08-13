@@ -263,20 +263,31 @@ function ProductRow({ product, onPress, PRIMARY, sign, c }: {
 }) {
   const hasModifiers = (product.modifierGroups?.length ?? 0) > 0
   const hasFlavors   = (product.flavors?.length ?? 0) > 0
+  const outOfStock   = product.inStock === false
   return (
     <TouchableOpacity
-      style={[rStyles.row, { borderBottomColor: c.border, backgroundColor: c.surface }]}
-      onPress={onPress}
-      activeOpacity={0.7}
+      style={[rStyles.row, { borderBottomColor: c.border, backgroundColor: c.surface }, outOfStock && rStyles.rowOut]}
+      onPress={outOfStock ? undefined : onPress}
+      activeOpacity={outOfStock ? 1 : 0.7}
+      disabled={outOfStock}
     >
       <View style={{ flex: 1 }}>
-        <Text style={[rStyles.name, { color: c.text }]} numberOfLines={1}>{product.name}</Text>
-        {hasFlavors   && <Text style={[rStyles.sub, { color: c.textMuted }]}>Con sabores</Text>}
-        {!hasFlavors && hasModifiers && <Text style={[rStyles.sub, { color: c.textMuted }]}>Personalizable</Text>}
+        <Text style={[rStyles.name, { color: outOfStock ? c.textMuted : c.text }]} numberOfLines={1}>{product.name}</Text>
+        {outOfStock
+          ? <Text style={rStyles.outTag}>Agotado</Text>
+          : hasFlavors
+            ? <Text style={[rStyles.sub, { color: c.textMuted }]}>Con sabores</Text>
+            : hasModifiers
+              ? <Text style={[rStyles.sub, { color: c.textMuted }]}>Personalizable</Text>
+              : null
+        }
       </View>
-      <Text style={[rStyles.price, { color: PRIMARY }]}>{formatCurrency(parseFloat(product.price), sign)}</Text>
-      <View style={[rStyles.addBtn, { backgroundColor: PRIMARY + '18' }]}>
-        <Ionicons name="add" size={20} color={PRIMARY} />
+      {outOfStock
+        ? null
+        : <Text style={[rStyles.price, { color: PRIMARY }]}>{formatCurrency(parseFloat(product.price), sign)}</Text>
+      }
+      <View style={[rStyles.addBtn, { backgroundColor: outOfStock ? '#fee2e2' : PRIMARY + '18' }]}>
+        <Ionicons name={outOfStock ? 'close' : 'add'} size={20} color={outOfStock ? '#ef4444' : PRIMARY} />
       </View>
     </TouchableOpacity>
   )
@@ -284,8 +295,10 @@ function ProductRow({ product, onPress, PRIMARY, sign, c }: {
 
 const rStyles = StyleSheet.create({
   row:    { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1, gap: 12 },
+  rowOut: { opacity: 0.65 },
   name:   { fontSize: 15, fontWeight: '600' },
   sub:    { fontSize: 12, marginTop: 2 },
+  outTag: { fontSize: 11, fontWeight: '700', color: '#ef4444', marginTop: 2 },
   price:  { fontSize: 14, fontWeight: '700', minWidth: 64, textAlign: 'right' },
   addBtn: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
 })

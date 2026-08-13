@@ -104,6 +104,7 @@ export interface Product {
   categoryId: string
   imageUrl: string | null
   isAvailable: boolean
+  inStock: boolean
   taxRateId: string | null
   prepTimeMin: number | null
   sortOrder: number

@@ -50,9 +50,14 @@ function ProductRow({ product, categories, primary, sign, onToggle, onEdit, c }:
         <Ionicons name="fast-food-outline" size={20} color={product.isAvailable ? primary : c.textMuted} />
       </View>
       <View style={{ flex: 1 }}>
-        <Text style={[s.productName, !product.isAvailable && s.textInactive]}>
-          {product.name}
-        </Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+          <Text style={[s.productName, !product.isAvailable && s.textInactive]} numberOfLines={1}>
+            {product.name}
+          </Text>
+          {product.isAvailable && !product.inStock && (
+            <View style={s.outBadge}><Text style={s.outBadgeText}>Agotado</Text></View>
+          )}
+        </View>
         <Text style={s.productSub}>
           {cat ? `${cat.emoji ? cat.emoji + ' ' : ''}${cat.name}` : 'Sin categoría'}
           {'  ·  '}{formatCurrency(parseFloat(product.price), sign)}
@@ -88,8 +93,8 @@ export default function ProductosScreen() {
   const [showNewCat,   setShowNewCat]   = useState(false)
   const [showEditProd, setShowEditProd] = useState(false)
   const [editingProd,  setEditingProd]  = useState<Product | null>(null)
-  const [prodForm, setProdForm]   = useState({ name: '', description: '', price: '', categoryId: '', isAvailable: true, flavors: [] as string[] })
-  const [editForm, setEditForm]   = useState({ name: '', description: '', price: '', categoryId: '', isAvailable: true, flavors: [] as string[] })
+  const [prodForm, setProdForm]   = useState({ name: '', description: '', price: '', categoryId: '', isAvailable: true, inStock: true, flavors: [] as string[] })
+  const [editForm, setEditForm]   = useState({ name: '', description: '', price: '', categoryId: '', isAvailable: true, inStock: true, flavors: [] as string[] })
   const [catForm,  setCatForm]    = useState({ name: '', emoji: '' })
   const [creating, setCreating]   = useState(false)
   const [updating, setUpdating]   = useState(false)
@@ -104,6 +109,7 @@ export default function ProductosScreen() {
       price:       p.price,
       categoryId:  p.categoryId,
       isAvailable: p.isAvailable,
+      inStock:     p.inStock,
       flavors:     p.flavors ?? [],
     })
     setNewFlavorEdit('')
@@ -123,6 +129,7 @@ export default function ProductosScreen() {
       price:       priceNum.toFixed(2),
       categoryId:  editForm.categoryId,
       isAvailable: editForm.isAvailable,
+      inStock:     editForm.inStock,
       flavors:     editForm.flavors,
     }
 
@@ -190,6 +197,7 @@ export default function ProductosScreen() {
       price:       priceNum.toFixed(2),
       categoryId:  prodForm.categoryId,
       isAvailable: prodForm.isAvailable,
+      inStock:     prodForm.inStock,
       flavors:     prodForm.flavors,
     }
 
@@ -203,7 +211,7 @@ export default function ProductosScreen() {
       old ? { ...old, products: [...old.products, tempProduct] } : old
     )
     setShowNewProd(false)
-    setProdForm({ name: '', description: '', price: '', categoryId: '', isAvailable: true, flavors: [] })
+    setProdForm({ name: '', description: '', price: '', categoryId: '', isAvailable: true, inStock: true, flavors: [] })
     setNewFlavor('')
     setCreating(true)
     try {
@@ -352,12 +360,27 @@ export default function ProductosScreen() {
                 })}
               </ScrollView>
               <View style={[s.switchRow, { marginTop: 20 }]}>
-                <Text style={[s.fieldLabel, { color: c.textSecondary }]}>Disponible</Text>
+                <View>
+                  <Text style={[s.fieldLabel, { color: c.textSecondary }]}>Visible en el POS</Text>
+                  <Text style={{ fontSize: 11, color: c.textMuted, marginTop: 2 }}>Desactivar oculta el producto</Text>
+                </View>
                 <Switch
                   value={editForm.isAvailable}
                   onValueChange={(v) => setEditForm((f) => ({ ...f, isAvailable: v }))}
                   trackColor={{ false: c.border, true: PRIMARY + '88' }}
                   thumbColor={editForm.isAvailable ? PRIMARY : c.textMuted}
+                />
+              </View>
+              <View style={s.switchRow}>
+                <View>
+                  <Text style={[s.fieldLabel, { color: c.textSecondary }]}>En stock</Text>
+                  <Text style={{ fontSize: 11, color: c.textMuted, marginTop: 2 }}>Desactivar muestra "Agotado"</Text>
+                </View>
+                <Switch
+                  value={editForm.inStock}
+                  onValueChange={(v) => setEditForm((f) => ({ ...f, inStock: v }))}
+                  trackColor={{ false: '#fca5a5', true: '#86efac' }}
+                  thumbColor={editForm.inStock ? '#16a34a' : '#dc2626'}
                 />
               </View>
               {/* Sabores */}
@@ -531,12 +554,27 @@ export default function ProductosScreen() {
               )}
 
               <View style={[s.switchRow, { marginTop: 20 }]}>
-                <Text style={[s.fieldLabel, { color: c.textSecondary }]}>Disponible al crear</Text>
+                <View>
+                  <Text style={[s.fieldLabel, { color: c.textSecondary }]}>Visible en el POS</Text>
+                  <Text style={{ fontSize: 11, color: c.textMuted, marginTop: 2 }}>Desactivar oculta el producto</Text>
+                </View>
                 <Switch
                   value={prodForm.isAvailable}
                   onValueChange={(v) => setProdForm((f) => ({ ...f, isAvailable: v }))}
                   trackColor={{ false: c.border, true: PRIMARY + '88' }}
                   thumbColor={prodForm.isAvailable ? PRIMARY : c.textMuted}
+                />
+              </View>
+              <View style={s.switchRow}>
+                <View>
+                  <Text style={[s.fieldLabel, { color: c.textSecondary }]}>En stock</Text>
+                  <Text style={{ fontSize: 11, color: c.textMuted, marginTop: 2 }}>Desactivar muestra "Agotado"</Text>
+                </View>
+                <Switch
+                  value={prodForm.inStock}
+                  onValueChange={(v) => setProdForm((f) => ({ ...f, inStock: v }))}
+                  trackColor={{ false: '#fca5a5', true: '#86efac' }}
+                  thumbColor={prodForm.inStock ? '#16a34a' : '#dc2626'}
                 />
               </View>
 
@@ -642,6 +680,8 @@ function makeStyles(c: ReturnType<typeof import('@/lib/theme').useAppColors>) {
     productSub:   { fontSize: 12, color: c.textMuted, marginTop: 2 },
     productDesc:  { fontSize: 11, color: c.textMuted, marginTop: 2, fontStyle: 'italic' },
     textInactive: { color: c.textMuted },
+    outBadge:     { backgroundColor: '#fee2e2', borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 },
+    outBadgeText: { fontSize: 10, fontWeight: '700', color: '#dc2626' },
 
     modalHeader: {
       flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
