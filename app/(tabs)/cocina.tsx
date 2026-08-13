@@ -62,7 +62,7 @@ function KitchenCard({ order, onUpdate }: { order: Order; onUpdate: () => void }
       <View style={styles.cardTop}>
         <View>
           <Text style={styles.cardId}>{order.displayCode ?? '#' + order.id.slice(-6).toUpperCase()}</Text>
-          {order.tableName    && <Text style={styles.cardSub}>Mesa {order.tableName}</Text>}
+          {order.tableName    && <Text style={styles.cardSub}>{order.tableName}</Text>}
           {order.customerName && <Text style={styles.cardSub}>{order.customerName}</Text>}
         </View>
         <View style={{ alignItems: 'flex-end' }}>

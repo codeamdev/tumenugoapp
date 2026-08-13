@@ -15,7 +15,8 @@ import { useNetworkStatus } from '@/hooks/use-network'
 import { ErrorView } from '@/components/ErrorView'
 import { useAppColors } from '@/lib/theme'
 import { ORDER_STATUS_LABELS, ORDER_STATUS_COLORS, ORDER_TYPE_LABELS } from '@/types'
-import type { Order, OrderStatus, Product, Category } from '@/types'
+import { ProductPickerModal, type PickedItem } from '@/components/ProductPickerModal'
+import type { Order, OrderStatus } from '@/types'
 
 // ─── Tabs ─────────────────────────────────────────────────────────────────────
 
@@ -45,7 +46,7 @@ function OrderRow({ order, onPress }: { order: Order; onPress: () => void }) {
   const sign  = tenant?.currencySign ?? '$'
 
   const origin = order.tableName
-    ? `Mesa ${order.tableName}`
+    ? order.tableName
     : ORDER_TYPE_LABELS[order.type] ?? order.type
 
   return (
@@ -346,289 +347,7 @@ function makePayStyles(c: ReturnType<typeof useAppColors>) {
   })
 }
 
-// ─── Modal: Agregar productos a pedido existente ──────────────────────────────
-
-interface ItemToAdd  { productId: string; name: string; price: number; qty: number }
-interface LibreItem  { id: string; name: string; price: number; qty: number }
-
-function AddItemsModal({ order, onClose, onAdded }: {
-  order: Order
-  onClose: () => void
-  onAdded: () => void
-}) {
-  const c = useAppColors()
-  const { tenant } = useAuthStore()
-  const PRIMARY = tenant?.primaryColor ?? '#2563eb'
-  const sign    = tenant?.currencySign ?? '$'
-
-  const { data: prodsData } = useQuery({
-    queryKey: ['products'],
-    queryFn: () => api.get<{ data: Product[] }>('/api/tenant/products').then((r) => r.data ?? []),
-    staleTime: 5 * 60_000,
-    gcTime: 24 * 60 * 60_000,
-  })
-  const { data: catsData } = useQuery({
-    queryKey: ['categories'],
-    queryFn: () => api.get<{ data: Category[] }>('/api/tenant/categories').then((r) => r.data ?? []),
-    staleTime: 10 * 60_000,
-    gcTime: 24 * 60 * 60_000,
-  })
-
-  const products   = (Array.isArray(prodsData) ? prodsData : []).filter((p) => p.isAvailable)
-  const categories = Array.isArray(catsData) ? catsData : []
-
-  const [search,    setSearch]    = useState('')
-  const [catId,     setCatId]     = useState<string | null>(null)
-  const [toAdd,     setToAdd]     = useState<Record<string, ItemToAdd>>({})
-  const [submitting, setSubmitting] = useState(false)
-  const [libreItems, setLibreItems] = useState<LibreItem[]>([])
-  const [libreName,  setLibreName]  = useState('')
-  const [librePrice, setLibrePrice] = useState('')
-
-  const visible = search
-    ? products.filter((p) => p.name.toLowerCase().includes(search.toLowerCase()))
-    : catId
-      ? products.filter((p) => p.categoryId === catId)
-      : []
-
-  function addLibre() {
-    const name  = libreName.trim()
-    const price = parseFloat(librePrice)
-    if (!name || isNaN(price) || price < 0) return
-    setLibreItems((prev) => [...prev, { id: `libre-${Date.now()}`, name, price, qty: 1 }])
-    setLibreName('')
-    setLibrePrice('')
-  }
-
-  function bumpLibre(id: string, delta: number) {
-    setLibreItems((prev) =>
-      prev.map((i) => i.id === id ? { ...i, qty: Math.max(0, i.qty + delta) } : i).filter((i) => i.qty > 0)
-    )
-  }
-
-  function bump(product: Product, delta: number) {
-    setToAdd((prev) => {
-      const cur = prev[product.id]?.qty ?? 0
-      const next = Math.max(0, cur + delta)
-      if (next === 0) {
-        const { [product.id]: _, ...rest } = prev
-        return rest
-      }
-      return { ...prev, [product.id]: { productId: product.id, name: product.name, price: parseFloat(product.price), qty: next } }
-    })
-  }
-
-  async function confirm() {
-    const catalogItems = Object.values(toAdd).map((i) => ({ productId: i.productId, quantity: i.qty, modifiers: [] }))
-    const freeItems    = libreItems.map((i) => ({ productId: null as null, customName: i.name, customPrice: i.price, quantity: i.qty, modifiers: [] }))
-    const allItems     = [...catalogItems, ...freeItems]
-    if (allItems.length === 0) return
-    setSubmitting(true)
-    try {
-      await api.patch(`/api/tenant/orders/${order.id}`, { action: 'add_items', items: allItems })
-      onAdded()
-      onClose()
-    } catch (err: any) {
-      Alert.alert('Error', err.message ?? 'No se pudo agregar los productos')
-    } finally {
-      setSubmitting(false)
-    }
-  }
-
-  const totalItems     = Object.values(toAdd).reduce((s, i) => s + i.qty, 0) + libreItems.reduce((s, i) => s + i.qty, 0)
-  const showingProducts = search.length > 0 || catId !== null
-
-  return (
-    <Modal visible animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
-      <SafeAreaView style={{ flex: 1, backgroundColor: c.background }} edges={['bottom']}>
-        {/* Header */}
-        <View style={[ai.header, { borderBottomColor: c.border }]}>
-          <Text style={[ai.title, { color: c.text }]}>Agregar productos</Text>
-          <TouchableOpacity onPress={onClose}>
-            <Ionicons name="close" size={24} color={c.textSecondary} />
-          </TouchableOpacity>
-        </View>
-
-        {/* Buscador */}
-        <View style={[ai.searchRow, { borderBottomColor: c.border }]}>
-          <View style={[ai.searchWrap, { backgroundColor: c.surfaceAlt, borderColor: c.border }]}>
-            <Ionicons name="search-outline" size={15} color={c.textMuted} />
-            <TextInput
-              style={[ai.searchInput, { color: c.text }]}
-              placeholder="Buscar producto..."
-              placeholderTextColor={c.textMuted}
-              value={search}
-              onChangeText={setSearch}
-            />
-            {search.length > 0 && (
-              <TouchableOpacity onPress={() => setSearch('')}>
-                <Ionicons name="close-circle" size={15} color={c.textMuted} />
-              </TouchableOpacity>
-            )}
-          </View>
-        </View>
-
-        {/* Categorías (chips horizontales) o productos */}
-        {!showingProducts ? (
-          <>
-            <Text style={[ai.hint, { color: c.textMuted }]}>Selecciona una categoría o busca por nombre</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={ai.chipScroll} contentContainerStyle={ai.chipContent}>
-              {categories.map((cat) => (
-                <TouchableOpacity
-                  key={cat.id}
-                  style={[ai.chip, { backgroundColor: c.surfaceAlt, borderColor: c.border }]}
-                  onPress={() => setCatId(cat.id)}
-                >
-                  <Text style={[ai.chipText, { color: c.textSecondary }]}>{cat.emoji} {cat.name}</Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          </>
-        ) : (
-          <>
-            {catId && !search && (
-              <TouchableOpacity style={[ai.back, { borderBottomColor: c.border }]} onPress={() => setCatId(null)}>
-                <Ionicons name="chevron-back" size={16} color={PRIMARY} />
-                <Text style={[ai.backText, { color: PRIMARY }]}>{categories.find((c) => c.id === catId)?.name}</Text>
-              </TouchableOpacity>
-            )}
-            <FlatList
-              data={visible}
-              keyExtractor={(p) => p.id}
-              renderItem={({ item }) => {
-                const qty = toAdd[item.id]?.qty ?? 0
-                return (
-                  <View style={[ai.prodRow, { borderBottomColor: c.border }]}>
-                    <View style={{ flex: 1 }}>
-                      <Text style={[ai.prodName, { color: c.text }]} numberOfLines={1}>{item.name}</Text>
-                      <Text style={[ai.prodPrice, { color: PRIMARY }]}>{formatCurrency(parseFloat(item.price), sign)}</Text>
-                    </View>
-                    <View style={ai.qtyCtrl}>
-                      <TouchableOpacity
-                        style={[ai.qtyBtn, { borderColor: qty > 0 ? PRIMARY : c.border }]}
-                        onPress={() => bump(item, -1)}
-                        disabled={qty === 0}
-                      >
-                        <Ionicons name="remove" size={16} color={qty > 0 ? PRIMARY : c.textMuted} />
-                      </TouchableOpacity>
-                      <Text style={[ai.qtyNum, { color: qty > 0 ? PRIMARY : c.textMuted }]}>{qty}</Text>
-                      <TouchableOpacity
-                        style={[ai.qtyBtn, { borderColor: PRIMARY }]}
-                        onPress={() => bump(item, 1)}
-                      >
-                        <Ionicons name="add" size={16} color={PRIMARY} />
-                      </TouchableOpacity>
-                    </View>
-                  </View>
-                )
-              }}
-              ListEmptyComponent={
-                <View style={{ alignItems: 'center', padding: 32 }}>
-                  <Text style={{ color: c.textMuted }}>Sin productos</Text>
-                </View>
-              }
-            />
-          </>
-        )}
-
-        {/* Producto libre */}
-        <View style={[ai.libreSection, { borderTopColor: c.border, backgroundColor: c.surface }]}>
-          <Text style={[ai.libreTitle, { color: c.textSecondary }]}>Producto libre</Text>
-          <View style={{ flexDirection: 'row', gap: 8 }}>
-            <TextInput
-              style={[ai.libreInput, { flex: 2, color: c.text, borderColor: c.border, backgroundColor: c.surfaceAlt }]}
-              placeholder="Nombre"
-              placeholderTextColor={c.textMuted}
-              value={libreName}
-              onChangeText={setLibreName}
-            />
-            <TextInput
-              style={[ai.libreInput, { flex: 1, color: c.text, borderColor: c.border, backgroundColor: c.surfaceAlt }]}
-              placeholder="Precio"
-              placeholderTextColor={c.textMuted}
-              value={librePrice}
-              onChangeText={setLibrePrice}
-              keyboardType="numeric"
-            />
-            <TouchableOpacity
-              style={[ai.libreAddBtn, { backgroundColor: libreName.trim() && librePrice ? PRIMARY : c.border }]}
-              onPress={addLibre}
-              disabled={!libreName.trim() || !librePrice}
-            >
-              <Ionicons name="add" size={20} color="#fff" />
-            </TouchableOpacity>
-          </View>
-          {libreItems.length > 0 && (
-            <View style={{ gap: 4, marginTop: 8 }}>
-              {libreItems.map((item) => (
-                <View key={item.id} style={[ai.libreItem, { borderColor: c.border }]}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={{ color: c.text, fontSize: 13, fontWeight: '600' }}>{item.name}</Text>
-                    <Text style={{ color: PRIMARY, fontSize: 12 }}>{formatCurrency(item.price, sign)}</Text>
-                  </View>
-                  <View style={ai.qtyCtrl}>
-                    <TouchableOpacity style={[ai.qtyBtn, { borderColor: PRIMARY }]} onPress={() => bumpLibre(item.id, -1)}>
-                      <Ionicons name="remove" size={14} color={PRIMARY} />
-                    </TouchableOpacity>
-                    <Text style={[ai.qtyNum, { color: PRIMARY }]}>{item.qty}</Text>
-                    <TouchableOpacity style={[ai.qtyBtn, { borderColor: PRIMARY }]} onPress={() => bumpLibre(item.id, 1)}>
-                      <Ionicons name="add" size={14} color={PRIMARY} />
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              ))}
-            </View>
-          )}
-        </View>
-
-        {/* Botón confirmar */}
-        {totalItems > 0 && (
-          <View style={[ai.footer, { borderTopColor: c.border }]}>
-            <TouchableOpacity
-              style={[ai.confirmBtn, { backgroundColor: PRIMARY }, submitting && { opacity: 0.6 }]}
-              onPress={confirm}
-              disabled={submitting}
-            >
-              {submitting
-                ? <ActivityIndicator color="#fff" />
-                : <Text style={ai.confirmText}>Agregar {totalItems} producto{totalItems !== 1 ? 's' : ''}</Text>
-              }
-            </TouchableOpacity>
-          </View>
-        )}
-      </SafeAreaView>
-    </Modal>
-  )
-}
-
-const ai = StyleSheet.create({
-  header:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 16, borderBottomWidth: 1 },
-  title:       { fontSize: 17, fontWeight: '700' },
-  searchRow:   { paddingHorizontal: 12, paddingVertical: 8, borderBottomWidth: 1 },
-  searchWrap:  { flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: 8, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 7 },
-  searchInput: { flex: 1, fontSize: 14, padding: 0 },
-  hint:        { fontSize: 12, textAlign: 'center', paddingTop: 12, paddingHorizontal: 16 },
-  chipScroll:  { flexGrow: 0, marginTop: 8 },
-  chipContent: { paddingHorizontal: 12, paddingBottom: 12, gap: 8 },
-  chip:        { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, borderWidth: 1 },
-  chipText:    { fontSize: 13, fontWeight: '500' },
-  back:        { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 12, paddingVertical: 10, borderBottomWidth: 1 },
-  backText:    { fontSize: 14, fontWeight: '600' },
-  prodRow:     { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, gap: 12 },
-  prodName:    { fontSize: 14, fontWeight: '600' },
-  prodPrice:   { fontSize: 12, marginTop: 2 },
-  qtyCtrl:     { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  qtyBtn:      { width: 30, height: 30, borderRadius: 15, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
-  qtyNum:      { fontSize: 15, fontWeight: '700', minWidth: 20, textAlign: 'center' },
-  footer:      { padding: 16, borderTopWidth: 1 },
-  confirmBtn:  { borderRadius: 12, padding: 15, alignItems: 'center' },
-  confirmText: { color: '#fff', fontWeight: '700', fontSize: 15 },
-  libreSection: { borderTopWidth: 1, padding: 12, gap: 6 },
-  libreTitle:   { fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 },
-  libreInput:   { borderWidth: 1, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 8, fontSize: 14 },
-  libreAddBtn:  { width: 40, height: 40, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
-  libreItem:    { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderRadius: 8, padding: 8, gap: 8 },
-})
+// (AddItemsModal replaced by ProductPickerModal — see src/components/ProductPickerModal.tsx)
 
 // ─── Modal detalle ────────────────────────────────────────────────────────────
 
@@ -913,10 +632,34 @@ function DetailModal({ order: orderProp, onClose, onRefresh, onRefreshDetail, re
       )}
 
       {addOpen && (
-        <AddItemsModal
-          order={order}
+        <ProductPickerModal
+          visible={addOpen}
+          title="Agregar al pedido"
+          confirmLabel="Agregar al pedido"
           onClose={() => setAddOpen(false)}
-          onAdded={async () => {
+          onConfirm={async (items: PickedItem[]) => {
+            const apiItems = items.map((i) => ({
+              productId: i.productId ?? undefined,
+              customName: i.productId ? undefined : i.name,
+              customPrice: i.productId ? undefined : i.unitPrice,
+              quantity: i.quantity,
+              notes: i.notes || undefined,
+              modifiers: i.modifiers.map((m) => ({
+                groupName: m.groupName,
+                modifierName: m.modifierName,
+                priceDelta: m.priceDelta,
+              })),
+            }))
+            try {
+              await api.patch(`/api/tenant/orders/${order!.id}`, { action: 'add_items', items: apiItems })
+            } catch (err: any) {
+              const isNetErr = !isConnected || err?.message?.includes('Network request failed')
+              if (isNetErr) {
+                Alert.alert('Sin conexión', 'No se pueden agregar productos sin conexión en este momento.')
+                return
+              }
+              throw err
+            }
             setAddOpen(false)
             if (onRefreshDetail) await onRefreshDetail()
             onRefresh()
