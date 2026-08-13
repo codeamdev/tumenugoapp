@@ -22,6 +22,7 @@ interface RemoteConfig {
     paymentMethods?: PaymentMethod[]
     defaultOpeningAmount?: number
     defaultDeliveryFee?: number
+    kitchenAlertMinutes?: number
   } | null
 }
 
@@ -49,6 +50,7 @@ export default function ConfiguracionScreen() {
   const [payMethods, setPayMethods]       = useState<PaymentMethod[]>(DEFAULT_PAYMENT_METHODS)
   const [newMethodLabel, setNewLabel]     = useState('')
   const [newMethodCredit, setNewCredit]   = useState(false)
+  const [kitchenAlert, setKitchenAlert]   = useState<number>(0)
 
   useEffect(() => {
     if (!user) return
@@ -72,6 +74,7 @@ export default function ConfiguracionScreen() {
     if (pc?.paymentMethods && pc.paymentMethods.length > 0) setPayMethods(pc.paymentMethods)
     if (pc?.defaultOpeningAmount != null) setDefaultOpening(String(pc.defaultOpeningAmount))
     if (pc?.defaultDeliveryFee != null) setDefaultFee(String(pc.defaultDeliveryFee))
+    setKitchenAlert(pc?.kitchenAlertMinutes ?? 0)
   }, [configData])
 
   async function handleSave() {
@@ -87,6 +90,7 @@ export default function ConfiguracionScreen() {
           paymentMethods: payMethods,
           ...(defaultOpening.trim() ? { defaultOpeningAmount: parseFloat(defaultOpening) } : {}),
           ...(defaultFee.trim() ? { defaultDeliveryFee: parseFloat(defaultFee) } : {}),
+          ...(kitchenAlert > 0 ? { kitchenAlertMinutes: kitchenAlert } : {}),
         },
       })
       qc.invalidateQueries({ queryKey: ['configuracion'] })
@@ -160,6 +164,29 @@ export default function ConfiguracionScreen() {
             keyboardType="numeric"
             editable={isConnected}
           />
+        </View>
+
+        {/* Alerta de cocina */}
+        <View style={styles.card}>
+          <Text style={styles.sectionTitle}>Alerta de cocina</Text>
+          <Text style={styles.hint}>Tiempo en preparación antes de que el pedido parpadee en rojo</Text>
+          <View style={{ flexDirection: 'row', gap: 8, marginTop: 4 }}>
+            {([0, 5, 10, 15] as const).map((min) => {
+              const sel = kitchenAlert === min
+              return (
+                <TouchableOpacity
+                  key={min}
+                  style={[styles.chip, { borderColor: sel ? PRIMARY : c.border, backgroundColor: sel ? PRIMARY : c.surfaceAlt }]}
+                  onPress={() => isConnected && setKitchenAlert(min)}
+                  disabled={!isConnected}
+                >
+                  <Text style={[styles.chipText, { color: sel ? '#fff' : c.textSecondary }]}>
+                    {min === 0 ? 'Desactivada' : `${min} min`}
+                  </Text>
+                </TouchableOpacity>
+              )
+            })}
+          </View>
         </View>
 
         {/* Campos de domicilio */}
@@ -284,6 +311,11 @@ function makeStyles(c: ReturnType<typeof import('@/lib/theme').useAppColors>) {
       paddingHorizontal: 12, paddingVertical: 10,
       fontSize: 15, color: c.text, backgroundColor: c.surfaceAlt,
     },
+
+    chip: {
+      paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, borderWidth: 1,
+    },
+    chipText: { fontSize: 13, fontWeight: '600' },
 
     switchRow: {
       flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',

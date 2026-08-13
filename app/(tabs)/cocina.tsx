@@ -1,6 +1,6 @@
 import {
   View, Text, FlatList, TouchableOpacity, StyleSheet,
-  Alert, ActivityIndicator, RefreshControl,
+  Alert, ActivityIndicator, RefreshControl, Animated,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
@@ -13,10 +13,11 @@ import { useNetworkStatus } from '@/hooks/use-network'
 import { ErrorView } from '@/components/ErrorView'
 import { useAppColors } from '@/lib/theme'
 import type { Order } from '@/types'
+import { useRef, useEffect } from 'react'
 
 // ─── Tarjeta de pedido ────────────────────────────────────────────────────────
 
-function KitchenCard({ order, onUpdate }: { order: Order; onUpdate: () => void }) {
+function KitchenCard({ order, onUpdate, alertMinutes }: { order: Order; onUpdate: () => void; alertMinutes: number }) {
   const { tenant } = useAuthStore()
   const { isConnected } = useNetworkStatus()
   const qc = useQueryClient()
@@ -32,6 +33,20 @@ function KitchenCard({ order, onUpdate }: { order: Order; onUpdate: () => void }
     : null
 
   const isUrgent = elapsedMin !== null && elapsedMin >= 15
+  const isLate   = isPreparing && alertMinutes > 0 && elapsedMin !== null && elapsedMin >= alertMinutes
+
+  const blinkAnim = useRef(new Animated.Value(1)).current
+  useEffect(() => {
+    if (!isLate) { blinkAnim.setValue(1); return }
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(blinkAnim, { toValue: 0.25, duration: 450, useNativeDriver: true }),
+        Animated.timing(blinkAnim, { toValue: 1,    duration: 450, useNativeDriver: true }),
+      ])
+    )
+    loop.start()
+    return () => loop.stop()
+  }, [isLate])
 
   async function advance(status: string) {
     // Optimistic update: preparing changes the dot color; ready removes the card
@@ -57,8 +72,13 @@ function KitchenCard({ order, onUpdate }: { order: Order; onUpdate: () => void }
   }
 
   return (
-    <View style={[styles.card, isUrgent && styles.cardUrgent]}>
+    <Animated.View style={[styles.card, isUrgent && styles.cardUrgent, isLate && styles.cardLate, { opacity: isLate ? blinkAnim : 1 }]}>
       {/* Cabecera */}
+      {isLate && (
+        <View style={styles.lateBar}>
+          <Text style={styles.lateText}>⚠ DEMORADO — {elapsedMin} min en preparación</Text>
+        </View>
+      )}
       <View style={styles.cardTop}>
         <View>
           <Text style={styles.cardId}>{order.displayCode ?? '#' + order.id.slice(-6).toUpperCase()}</Text>
@@ -112,7 +132,7 @@ function KitchenCard({ order, onUpdate }: { order: Order; onUpdate: () => void }
           </TouchableOpacity>
         )}
       </View>
-    </View>
+    </Animated.View>
   )
 }
 
@@ -120,10 +140,11 @@ function KitchenCard({ order, onUpdate }: { order: Order; onUpdate: () => void }
 
 export default function CocinaScreen() {
   const qc = useQueryClient()
-  const { tenant } = useAuthStore()
+  const { tenant, config } = useAuthStore()
   const c = useAppColors()
   const styles = makeStyles(c)
   const PRIMARY = tenant?.primaryColor ?? '#2563eb'
+  const alertMinutes = config?.kitchenAlertMinutes ?? 0
 
   const { data, isLoading, isError, isRefetching, refetch } = useQuery({
     queryKey: ['kitchen'],
@@ -168,7 +189,7 @@ export default function CocinaScreen() {
       <FlatList
         data={all}
         keyExtractor={(o) => o.id}
-        renderItem={({ item }) => <KitchenCard order={item} onUpdate={onUpdate} />}
+        renderItem={({ item }) => <KitchenCard order={item} onUpdate={onUpdate} alertMinutes={alertMinutes} />}
         contentContainerStyle={styles.list}
         refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={PRIMARY} />}
         ListEmptyComponent={
@@ -207,6 +228,12 @@ function makeStyles(c: ReturnType<typeof useAppColors>) {
       borderLeftWidth: 4, borderLeftColor: '#f59e0b',
     },
     cardUrgent: { borderLeftColor: '#ef4444' },
+    cardLate:   { borderLeftColor: '#ef4444', borderWidth: 2, borderColor: '#ef4444' },
+    lateBar: {
+      backgroundColor: '#fef2f2', borderRadius: 6, paddingHorizontal: 10, paddingVertical: 5,
+      marginBottom: 10, flexDirection: 'row', alignItems: 'center',
+    },
+    lateText: { fontSize: 12, fontWeight: '700', color: '#dc2626', flex: 1 },
 
     cardTop: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 },
     cardId:  { fontSize: 18, fontWeight: '800', color: c.text },

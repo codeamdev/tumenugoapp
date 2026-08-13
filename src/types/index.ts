@@ -26,6 +26,7 @@ export interface TenantConfig {
   }
   defaultOpeningAmount?: number
   defaultDeliveryFee?: number
+  kitchenAlertMinutes?: number
 }
 
 // Backend uses 'table' | 'bar' | 'delivery'

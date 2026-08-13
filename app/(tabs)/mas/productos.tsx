@@ -58,6 +58,7 @@ function ProductRow({ product, categories, primary, sign, onToggle, onEdit, c }:
           {'  ·  '}{formatCurrency(parseFloat(product.price), sign)}
           {(product.flavors?.length ?? 0) > 0 ? `  ·  ${product.flavors.length} sabor${product.flavors.length > 1 ? 'es' : ''}` : ''}
         </Text>
+        {product.description ? <Text style={s.productDesc}>{product.description}</Text> : null}
       </View>
       <TouchableOpacity onPress={() => onEdit(product)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} style={{ marginRight: 8 }}>
         <Ionicons name="pencil-outline" size={16} color={c.textMuted} />
@@ -87,8 +88,8 @@ export default function ProductosScreen() {
   const [showNewCat,   setShowNewCat]   = useState(false)
   const [showEditProd, setShowEditProd] = useState(false)
   const [editingProd,  setEditingProd]  = useState<Product | null>(null)
-  const [prodForm, setProdForm]   = useState({ name: '', price: '', categoryId: '', isAvailable: true, flavors: [] as string[] })
-  const [editForm, setEditForm]   = useState({ name: '', price: '', categoryId: '', isAvailable: true, flavors: [] as string[] })
+  const [prodForm, setProdForm]   = useState({ name: '', description: '', price: '', categoryId: '', isAvailable: true, flavors: [] as string[] })
+  const [editForm, setEditForm]   = useState({ name: '', description: '', price: '', categoryId: '', isAvailable: true, flavors: [] as string[] })
   const [catForm,  setCatForm]    = useState({ name: '', emoji: '' })
   const [creating, setCreating]   = useState(false)
   const [updating, setUpdating]   = useState(false)
@@ -99,6 +100,7 @@ export default function ProductosScreen() {
     setEditingProd(p)
     setEditForm({
       name:        p.name,
+      description: p.description ?? '',
       price:       p.price,
       categoryId:  p.categoryId,
       isAvailable: p.isAvailable,
@@ -117,6 +119,7 @@ export default function ProductosScreen() {
     const productId = editingProd!.id
     const body = {
       name:        editForm.name.trim(),
+      description: editForm.description.trim() || null,
       price:       priceNum.toFixed(2),
       categoryId:  editForm.categoryId,
       isAvailable: editForm.isAvailable,
@@ -183,6 +186,7 @@ export default function ProductosScreen() {
     const tempId = `local_${Date.now()}`
     const body = {
       name:        prodForm.name.trim(),
+      description: prodForm.description.trim() || null,
       price:       priceNum.toFixed(2),
       categoryId:  prodForm.categoryId,
       isAvailable: prodForm.isAvailable,
@@ -191,7 +195,7 @@ export default function ProductosScreen() {
 
     // Optimistic: insert temp product into cache immediately
     const tempProduct: Product = {
-      id: tempId, description: null, imageUrl: null,
+      id: tempId, imageUrl: null,
       taxRateId: null, prepTimeMin: null, sortOrder: 0, modifierGroups: [],
       ...body,
     }
@@ -199,7 +203,7 @@ export default function ProductosScreen() {
       old ? { ...old, products: [...old.products, tempProduct] } : old
     )
     setShowNewProd(false)
-    setProdForm({ name: '', price: '', categoryId: '', isAvailable: true, flavors: [] })
+    setProdForm({ name: '', description: '', price: '', categoryId: '', isAvailable: true, flavors: [] })
     setNewFlavor('')
     setCreating(true)
     try {
@@ -310,6 +314,16 @@ export default function ProductosScreen() {
                 value={editForm.name}
                 onChangeText={(v) => setEditForm((f) => ({ ...f, name: v }))}
                 autoFocus
+              />
+              <Text style={[s.fieldLabel, { color: c.textSecondary, marginTop: 16 }]}>Descripción</Text>
+              <TextInput
+                style={[s.fieldInput, { color: c.text, borderColor: c.border, backgroundColor: c.surfaceAlt, minHeight: 60, textAlignVertical: 'top' }]}
+                placeholder="Ingredientes, alérgenos, variantes…"
+                placeholderTextColor={c.textMuted}
+                value={editForm.description}
+                onChangeText={(v) => setEditForm((f) => ({ ...f, description: v }))}
+                multiline
+                numberOfLines={2}
               />
               <Text style={[s.fieldLabel, { color: c.textSecondary, marginTop: 16 }]}>Precio *</Text>
               <TextInput
@@ -468,6 +482,17 @@ export default function ProductosScreen() {
                 autoFocus
               />
 
+              <Text style={[s.fieldLabel, { color: c.textSecondary, marginTop: 16 }]}>Descripción</Text>
+              <TextInput
+                style={[s.fieldInput, { color: c.text, borderColor: c.border, backgroundColor: c.surfaceAlt, minHeight: 60, textAlignVertical: 'top' }]}
+                placeholder="Ingredientes, alérgenos, variantes…"
+                placeholderTextColor={c.textMuted}
+                value={prodForm.description}
+                onChangeText={(v) => setProdForm((f) => ({ ...f, description: v }))}
+                multiline
+                numberOfLines={2}
+              />
+
               <Text style={[s.fieldLabel, { color: c.textSecondary, marginTop: 16 }]}>Precio *</Text>
               <TextInput
                 style={[s.fieldInput, { color: c.text, borderColor: c.border, backgroundColor: c.surfaceAlt }]}
@@ -615,6 +640,7 @@ function makeStyles(c: ReturnType<typeof import('@/lib/theme').useAppColors>) {
     },
     productName:  { fontSize: 15, fontWeight: '600', color: c.text },
     productSub:   { fontSize: 12, color: c.textMuted, marginTop: 2 },
+    productDesc:  { fontSize: 11, color: c.textMuted, marginTop: 2, fontStyle: 'italic' },
     textInactive: { color: c.textMuted },
 
     modalHeader: {
