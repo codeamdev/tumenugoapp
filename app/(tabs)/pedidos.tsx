@@ -655,10 +655,11 @@ function DetailModal({ order: orderProp, onClose, onRefresh, onRefreshDetail, re
             } catch (err: any) {
               const isNetErr = !isConnected || err?.message?.includes('Network request failed')
               if (isNetErr) {
-                Alert.alert('Sin conexión', 'No se pueden agregar productos sin conexión en este momento.')
-                return
+                enqueueSync('add_order_items', { orderId: order!.id, items: apiItems })
+                Alert.alert('Sin conexión', 'Los productos se agregarán al reconectar.')
+              } else {
+                throw err
               }
-              throw err
             }
             setAddOpen(false)
             if (onRefreshDetail) await onRefreshDetail()

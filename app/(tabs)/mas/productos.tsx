@@ -113,22 +113,35 @@ export default function ProductosScreen() {
     if (!editForm.name.trim())           { Alert.alert('Error', 'El nombre es requerido'); return }
     if (isNaN(priceNum) || priceNum < 0) { Alert.alert('Error', 'Precio inválido'); return }
     if (!editForm.categoryId)            { Alert.alert('Error', 'Selecciona una categoría'); return }
-    if (!isConnected)                    { Alert.alert('Sin conexión', 'Se requiere conexión para editar productos'); return }
+
+    const productId = editingProd!.id
+    const body = {
+      name:        editForm.name.trim(),
+      price:       priceNum.toFixed(2),
+      categoryId:  editForm.categoryId,
+      isAvailable: editForm.isAvailable,
+      flavors:     editForm.flavors,
+    }
+
+    // Optimistic update
+    qc.setQueryData<{ products: Product[]; categories: Category[] }>(['products-mgmt'], (old) =>
+      old ? { ...old, products: old.products.map((p) => p.id === productId ? { ...p, ...body } : p) } : old
+    )
+    setShowEditProd(false)
     setUpdating(true)
     try {
-      await api.patch(`/api/tenant/products/${editingProd!.id}`, {
-        name:        editForm.name.trim(),
-        price:       priceNum.toFixed(2),
-        categoryId:  editForm.categoryId,
-        isAvailable: editForm.isAvailable,
-        flavors:     editForm.flavors,
-      })
+      await api.patch(`/api/tenant/products/${productId}`, body)
       qc.invalidateQueries({ queryKey: ['products-mgmt'] })
       qc.invalidateQueries({ queryKey: ['products'] })
-      setShowEditProd(false)
-      Alert.alert('Guardado', 'Producto actualizado correctamente.')
     } catch (err: any) {
-      Alert.alert('Error', err.message ?? 'No se pudo actualizar')
+      const isNetErr = !isConnected || err?.message?.includes('Network request failed')
+      if (isNetErr) {
+        enqueueSync('update_product', { productId, ...body })
+        Alert.alert('Sin conexión', 'El cambio se sincronizará al reconectar.')
+      } else {
+        qc.invalidateQueries({ queryKey: ['products-mgmt'] }) // revert
+        Alert.alert('Error', err.message ?? 'No se pudo actualizar')
+      }
     } finally { setUpdating(false) }
   }
 
@@ -166,24 +179,44 @@ export default function ProductosScreen() {
     if (!prodForm.name.trim())          { Alert.alert('Error', 'El nombre es requerido'); return }
     if (isNaN(priceNum) || priceNum < 0){ Alert.alert('Error', 'Precio inválido'); return }
     if (!prodForm.categoryId)           { Alert.alert('Error', 'Selecciona una categoría'); return }
-    if (!isConnected)                   { Alert.alert('Sin conexión', 'Se requiere conexión para crear productos'); return }
+
+    const tempId = `local_${Date.now()}`
+    const body = {
+      name:        prodForm.name.trim(),
+      price:       priceNum.toFixed(2),
+      categoryId:  prodForm.categoryId,
+      isAvailable: prodForm.isAvailable,
+      flavors:     prodForm.flavors,
+    }
+
+    // Optimistic: insert temp product into cache immediately
+    const tempProduct: Product = {
+      id: tempId, description: null, imageUrl: null,
+      taxRateId: null, prepTimeMin: null, sortOrder: 0, modifierGroups: [],
+      ...body,
+    }
+    qc.setQueryData<{ products: Product[]; categories: Category[] }>(['products-mgmt'], (old) =>
+      old ? { ...old, products: [...old.products, tempProduct] } : old
+    )
+    setShowNewProd(false)
+    setProdForm({ name: '', price: '', categoryId: '', isAvailable: true, flavors: [] })
+    setNewFlavor('')
     setCreating(true)
     try {
-      await api.post('/api/tenant/products', {
-        name:        prodForm.name.trim(),
-        price:       priceNum.toFixed(2),
-        categoryId:  prodForm.categoryId,
-        isAvailable: prodForm.isAvailable,
-        flavors:     prodForm.flavors,
-      })
+      await api.post('/api/tenant/products', body)
       qc.invalidateQueries({ queryKey: ['products-mgmt'] })
       qc.invalidateQueries({ queryKey: ['products'] })
-      setShowNewProd(false)
-      setProdForm({ name: '', price: '', categoryId: '', isAvailable: true, flavors: [] })
-      setNewFlavor('')
-      Alert.alert('Creado', 'Producto creado correctamente.')
     } catch (err: any) {
-      Alert.alert('Error', err.message ?? 'No se pudo crear el producto')
+      const isNetErr = !isConnected || err?.message?.includes('Network request failed')
+      if (isNetErr) {
+        enqueueSync('create_product', { tempId, ...body })
+        Alert.alert('Sin conexión', 'El producto se creará al reconectar.')
+      } else {
+        qc.setQueryData<{ products: Product[]; categories: Category[] }>(['products-mgmt'], (old) =>
+          old ? { ...old, products: old.products.filter((p) => p.id !== tempId) } : old
+        )
+        Alert.alert('Error', err.message ?? 'No se pudo crear el producto')
+      }
     } finally { setCreating(false) }
   }
 
@@ -234,9 +267,8 @@ export default function ProductosScreen() {
           <Text style={[s.actionBtnText, { color: isConnected ? PRIMARY : c.textMuted }]}>+ Categoría</Text>
         </TouchableOpacity>
         <TouchableOpacity
-          style={[s.actionBtn, { backgroundColor: isConnected ? PRIMARY : c.textMuted }]}
+          style={[s.actionBtn, { backgroundColor: PRIMARY }]}
           onPress={() => setShowNewProd(true)}
-          disabled={!isConnected}
         >
           <Ionicons name="add-circle-outline" size={14} color="#fff" />
           <Text style={[s.actionBtnText, { color: '#fff' }]}>+ Producto</Text>

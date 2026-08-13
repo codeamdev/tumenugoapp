@@ -69,17 +69,26 @@ function TableCard({
   async function confirmDelete(t: Table) {
     Alert.alert(
       'Eliminar mesa',
-      `¿Eliminar Mesa ${t.name}? Esta acción no se puede deshacer.`,
+      `¿Eliminar "${t.name}"? Esta acción no se puede deshacer.`,
       [
         { text: 'Cancelar', style: 'cancel' },
         {
           text: 'Eliminar', style: 'destructive',
           onPress: async () => {
+            // Optimistic: remove from cache immediately
+            qc.setQueryData<Table[]>(['tables'], (old = []) => old.filter((tbl) => tbl.id !== t.id))
             try {
               await api.delete(`/api/tenant/tables/${t.id}`)
               qc.invalidateQueries({ queryKey: ['tables'] })
             } catch (err: any) {
-              Alert.alert('Error', err.message ?? 'No se pudo eliminar')
+              const isNetErr = !isConnected || (err?.message ?? '').includes('Network request failed')
+              if (isNetErr) {
+                enqueueSync('delete_table', { tableId: t.id })
+                Alert.alert('Sin conexión', 'La eliminación se sincronizará al reconectar.')
+              } else {
+                qc.invalidateQueries({ queryKey: ['tables'] }) // revert
+                Alert.alert('Error', err.message ?? 'No se pudo eliminar')
+              }
             }
           },
         },
@@ -98,7 +107,7 @@ function TableCard({
       delayLongPress={400}
     >
       <View style={{ flex: 1 }}>
-        <Text style={s.tableName}>Mesa {table.name}</Text>
+        <Text style={s.tableName}>{table.name}</Text>
         {table.zone ? <Text style={s.tableSub}>{table.zone}</Text> : null}
         {table.capacity ? <Text style={s.tableSub}>{table.capacity} personas</Text> : null}
       </View>
@@ -161,21 +170,44 @@ export default function MesasScreen() {
     if (!form.name.trim()) { Alert.alert('Error', 'El nombre es requerido'); return }
     const cap = parseInt(form.capacity)
     if (isNaN(cap) || cap < 1) { Alert.alert('Error', 'Capacidad inválida'); return }
-    if (!isConnected) { Alert.alert('Sin conexión', 'Se requiere conexión para gestionar mesas'); return }
-    setSaving(true)
-    try {
-      const body = { name: form.name.trim(), capacity: cap, zone: form.zone }
-      if (editing) {
+
+    const body = { name: form.name.trim(), capacity: cap, zone: form.zone }
+    setShowModal(false)
+
+    if (editing) {
+      // Optimistic edit
+      qc.setQueryData<Table[]>(['tables'], (old = []) =>
+        old.map((t) => t.id === editing.id ? { ...t, ...body } : t)
+      )
+      try {
         await api.patch(`/api/tenant/tables/${editing.id}`, body)
-      } else {
-        await api.post('/api/tenant/tables', body)
+        qc.invalidateQueries({ queryKey: ['tables'] })
+      } catch (err: any) {
+        const isNetErr = !isConnected || (err?.message ?? '').includes('Network request failed')
+        if (isNetErr) {
+          enqueueSync('update_table', { tableId: editing.id, ...body })
+        } else {
+          qc.invalidateQueries({ queryKey: ['tables'] }) // revert
+          Alert.alert('Error', err.message ?? 'No se pudo guardar')
+        }
       }
-      qc.invalidateQueries({ queryKey: ['tables'] })
-      setShowModal(false)
-    } catch (err: any) {
-      Alert.alert('Error', err.message ?? 'No se pudo guardar')
-    } finally {
-      setSaving(false)
+    } else {
+      // Optimistic create with temp ID
+      const tempId = `local_${Date.now()}`
+      const tempTable: Table = { id: tempId, ...body, status: 'available', isActive: true } as any
+      qc.setQueryData<Table[]>(['tables'], (old = []) => [...old, tempTable])
+      try {
+        await api.post('/api/tenant/tables', body)
+        qc.invalidateQueries({ queryKey: ['tables'] }) // replaces temp with real
+      } catch (err: any) {
+        const isNetErr = !isConnected || (err?.message ?? '').includes('Network request failed')
+        if (isNetErr) {
+          enqueueSync('create_table', { tempId, ...body })
+        } else {
+          qc.setQueryData<Table[]>(['tables'], (old = []) => old.filter((t) => t.id !== tempId))
+          Alert.alert('Error', err.message ?? 'No se pudo crear la mesa')
+        }
+      }
     }
   }
 

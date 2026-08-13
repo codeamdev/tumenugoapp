@@ -7,6 +7,13 @@ export type SyncOpType =
   | 'cancel_item'
   | 'toggle_product'
   | 'toggle_table_status'
+  | 'create_table'
+  | 'update_table'
+  | 'delete_table'
+  | 'add_order_items'
+  | 'create_product'
+  | 'update_product'
+  | 'delete_product'
 
 export interface SyncItem {
   id: string
@@ -141,6 +148,48 @@ async function processSyncItem(item: SyncItem): Promise<void> {
     case 'toggle_table_status': {
       const { tableId, ...body } = item.payload
       await api.patch(`/api/tenant/tables/${tableId}`, body)
+      break
+    }
+
+    case 'create_table': {
+      const { tempId: _tempId, ...body } = item.payload
+      await api.post('/api/tenant/tables', body)
+      break
+    }
+
+    case 'update_table': {
+      const { tableId, ...body } = item.payload
+      await api.patch(`/api/tenant/tables/${tableId}`, body)
+      break
+    }
+
+    case 'delete_table': {
+      const { tableId } = item.payload
+      await api.delete(`/api/tenant/tables/${tableId}`)
+      break
+    }
+
+    case 'add_order_items': {
+      const { orderId, items } = item.payload
+      await api.patch(`/api/tenant/orders/${orderId}`, { action: 'add_items', items })
+      break
+    }
+
+    case 'create_product': {
+      const { tempId: _t, ...body } = item.payload
+      await api.post('/api/tenant/products', body)
+      break
+    }
+
+    case 'update_product': {
+      const { productId, ...body } = item.payload
+      await api.patch(`/api/tenant/products/${productId}`, body)
+      break
+    }
+
+    case 'delete_product': {
+      const { productId } = item.payload
+      await api.delete(`/api/tenant/products/${productId}`)
       break
     }
   }
