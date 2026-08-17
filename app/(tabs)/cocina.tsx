@@ -96,7 +96,7 @@ function KitchenCard({ order, onUpdate, alertMinutes }: { order: Order; onUpdate
   }
 
   return (
-    <Animated.View style={[styles.card, isUrgent && styles.cardUrgent, isLate && styles.cardLate, { opacity: isLate ? blinkAnim : 1 }]}>
+    <Animated.View style={[styles.card, isPreparing && styles.cardPreparing, isUrgent && styles.cardUrgent, isLate && styles.cardLate, { opacity: isLate ? blinkAnim : 1 }]}>
       {/* Cabecera */}
       {isLate && (
         <View style={styles.lateBar}>
@@ -280,8 +280,9 @@ function makeStyles(c: ReturnType<typeof useAppColors>) {
     card: {
       backgroundColor: c.surface, borderRadius: 14, padding: 16,
       shadowColor: c.shadow, shadowOpacity: 0.06, shadowRadius: 8, elevation: 3,
-      borderLeftWidth: 4, borderLeftColor: '#f59e0b',
+      borderLeftWidth: 4, borderLeftColor: '#2563eb',
     },
+    cardPreparing: { borderLeftColor: '#ea580c' },
     cardUrgent: { borderLeftColor: '#ef4444' },
     cardLate:   { borderLeftColor: '#ef4444', borderWidth: 2, borderColor: '#ef4444' },
     lateBar: {
@@ -298,8 +299,8 @@ function makeStyles(c: ReturnType<typeof useAppColors>) {
     elapsedUrgent: { color: '#ef4444' },
 
     dot: { width: 10, height: 10, borderRadius: 5 },
-    dotSent:      { backgroundColor: '#f59e0b' },
-    dotPreparing: { backgroundColor: '#f97316' },
+    dotSent:      { backgroundColor: '#2563eb' },
+    dotPreparing: { backgroundColor: '#ea580c' },
 
     orderNotes: {
       backgroundColor: '#fefce8', borderRadius: 6, paddingHorizontal: 10, paddingVertical: 6,
