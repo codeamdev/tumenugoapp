@@ -164,8 +164,7 @@ function PayModal({ order, onClose, onRefresh }: {
         })
         removeOrderFromCache(order.id)
         qc.setQueryData<Order[]>(['orders', 'active'], (old = []) => old.filter((o) => o.id !== order.id))
-        onClose()
-        Alert.alert('Sin conexión', 'El cobro se registrará automáticamente al reconectar.')
+        onClose() // OfflineBanner muestra el estado de sincronización pendiente
       } else {
         Alert.alert('Error', err.message)
       }

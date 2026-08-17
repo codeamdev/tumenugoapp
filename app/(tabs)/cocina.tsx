@@ -1,6 +1,6 @@
 import {
   View, Text, FlatList, TouchableOpacity, StyleSheet,
-  Alert, ActivityIndicator, RefreshControl, Animated,
+  Alert, ActivityIndicator, RefreshControl, Animated, Vibration,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
@@ -49,6 +49,15 @@ function KitchenCard({ order, onUpdate, alertMinutes }: { order: Order; onUpdate
     return () => loop.stop()
   }, [isLate])
 
+  const wasLate = useRef(false)
+  useEffect(() => {
+    if (isLate && !wasLate.current) {
+      Vibration.vibrate([0, 300, 200, 300])
+      wasLate.current = true
+    }
+    if (!isLate) wasLate.current = false
+  }, [isLate])
+
   async function advance(status: string) {
     // Optimistic update TanStack Query
     qc.setQueryData<Order[]>(['kitchen'], (old = []) =>
@@ -70,8 +79,7 @@ function KitchenCard({ order, onUpdate, alertMinutes }: { order: Order; onUpdate
       const isNetErr = !isConnected || (err as any)?.status === 0 || err?.message?.includes('Network request failed')
       if (isNetErr) {
         enqueueSync('update_order_status', { orderId: order.id, status })
-        Alert.alert('Sin conexión', 'El cambio se sincronizará al reconectar.')
-        // Mantener cambios optimistas (TQ + SQLite)
+        // Mantener cambios optimistas (TQ + SQLite) — OfflineBanner muestra el estado
       } else {
         // Error de servidor: revertir ambos
         qc.setQueryData<Order[]>(['kitchen'], (old = []) =>
@@ -109,6 +117,13 @@ function KitchenCard({ order, onUpdate, alertMinutes }: { order: Order; onUpdate
           )}
         </View>
       </View>
+
+      {/* Nota del pedido */}
+      {order.notes ? (
+        <View style={styles.orderNotes}>
+          <Text style={styles.orderNotesText}>📝 {order.notes}</Text>
+        </View>
+      ) : null}
 
       {/* Productos */}
       <View style={styles.itemList}>
@@ -183,6 +198,17 @@ export default function CocinaScreen() {
   const sent     = orders.filter((o) => o.status === 'sent')
   const preparing = orders.filter((o) => o.status === 'preparing')
   const all      = [...sent, ...preparing]
+
+  // Vibrar cuando llegan pedidos nuevos a cocina
+  const knownOrderIds = useRef(new Set<string>())
+  useEffect(() => {
+    if (!data) return
+    const currentIds = new Set(data.map((o) => o.id))
+    if (knownOrderIds.current.size > 0 && [...currentIds].some((id) => !knownOrderIds.current.has(id))) {
+      Vibration.vibrate([0, 200, 100, 200])
+    }
+    knownOrderIds.current = currentIds
+  }, [data])
 
   function onUpdate() {
     qc.invalidateQueries({ queryKey: ['kitchen'] })
@@ -271,6 +297,12 @@ function makeStyles(c: ReturnType<typeof useAppColors>) {
     dot: { width: 10, height: 10, borderRadius: 5 },
     dotSent:      { backgroundColor: '#f59e0b' },
     dotPreparing: { backgroundColor: '#f97316' },
+
+    orderNotes: {
+      backgroundColor: '#fefce8', borderRadius: 6, paddingHorizontal: 10, paddingVertical: 6,
+      marginBottom: 10,
+    },
+    orderNotesText: { fontSize: 13, color: '#a16207', fontWeight: '600' },
 
     itemList: { gap: 8, marginBottom: 14 },
     itemRow:  { flexDirection: 'row', gap: 8, alignItems: 'flex-start' },

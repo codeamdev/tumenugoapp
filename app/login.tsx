@@ -99,6 +99,25 @@ export default function LoginScreen() {
       Alert.alert('Campos requeridos', 'Ingresa tu correo y contraseña.')
       return
     }
+
+    // Sin conexión: saltar llamada API (evita esperar 30-60s de timeout del SO)
+    if (isOffline) {
+      setLoading(true)
+      try {
+        const ok = await offlineLogin({ email: trimEmail, password })
+        if (ok) return
+        Alert.alert(
+          'Sin conexión',
+          hasOffline
+            ? 'Contraseña incorrecta. Intenta de nuevo.'
+            : 'No hay datos guardados en este dispositivo. Necesitás internet para el primer ingreso.',
+        )
+      } finally {
+        setLoading(false)
+      }
+      return
+    }
+
     setLoading(true)
     try {
       await login({ email: trimEmail, password, tenantSlug: slugOverride })
@@ -112,11 +131,10 @@ export default function LoginScreen() {
         }
       }
 
-      // Sin conexión: intentar login offline con credenciales guardadas
       const isNetworkErr = err instanceof ApiError && err.status === 0
       if (isNetworkErr) {
         const ok = await offlineLogin({ email: trimEmail, password })
-        if (ok) return  // AuthGuard redirigirá automáticamente
+        if (ok) return
         Alert.alert(
           'Sin conexión',
           hasOffline

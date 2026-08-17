@@ -799,12 +799,6 @@ function CartModal({ visible, onClose, tables }: {
               <View style={s.section}>
                 <Text style={s.sectionLabel}>Mesa</Text>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                  <TouchableOpacity
-                    style={[s.chip, !tableId && { backgroundColor: PRIMARY, borderColor: PRIMARY }]}
-                    onPress={() => setTable(null, null)}
-                  >
-                    <Text style={[s.chipText, !tableId && { color: c.textInverse }]}>Sin mesa</Text>
-                  </TouchableOpacity>
                   {tables.filter((t) => t.status !== 'occupied').map((t) => (
                     <TouchableOpacity
                       key={t.id}
