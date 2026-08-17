@@ -13,17 +13,35 @@ import { usePosStore } from '@/stores/pos-store'
 import { useAuthStore } from '@/stores/auth-store'
 import { formatCurrency } from '@/lib/utils'
 import { enqueueSync, saveOfflineOrder } from '@/lib/offline/sync-queue'
+import {
+  saveProductsToCache, getProductsFromCache,
+  saveCategoriesToCache, getCategoriesFromCache,
+  saveTablesToCache, getTablesFromCache,
+  upsertOrderInCache,
+} from '@/lib/offline/cache'
 import { useNetworkStatus } from '@/hooks/use-network'
 import { ErrorView } from '@/components/ErrorView'
 import { useAppColors } from '@/lib/theme'
-import type { Product, Category, Table, ModifierGroup, CartModifier } from '@/types'
+import type { Product, Category, Table, ModifierGroup, CartModifier, Order, OrderItem } from '@/types'
 
 // ─── Hooks de datos ───────────────────────────────────────────────────────────
 
 function useProducts() {
   return useQuery({
     queryKey: ['products'],
-    queryFn: () => api.get<{ data: Product[] }>('/api/tenant/products').then((r) => r.data),
+    queryFn: async () => {
+      try {
+        const data = await api.get<{ data: Product[] }>('/api/tenant/products').then((r) => r.data)
+        saveProductsToCache(data)
+        return data
+      } catch {
+        const cached = getProductsFromCache()
+        if (cached) return cached
+        throw new Error('Sin conexión y sin datos guardados')
+      }
+    },
+    initialData: () => getProductsFromCache() ?? undefined,
+    initialDataUpdatedAt: 0,
     staleTime: 5 * 60_000,
     gcTime: 24 * 60 * 60_000,
   })
@@ -32,7 +50,19 @@ function useProducts() {
 function useCategories() {
   return useQuery({
     queryKey: ['categories'],
-    queryFn: () => api.get<{ data: Category[] }>('/api/tenant/categories').then((r) => r.data),
+    queryFn: async () => {
+      try {
+        const data = await api.get<{ data: Category[] }>('/api/tenant/categories').then((r) => r.data)
+        saveCategoriesToCache(data)
+        return data
+      } catch {
+        const cached = getCategoriesFromCache()
+        if (cached) return cached
+        throw new Error('Sin conexión y sin datos guardados')
+      }
+    },
+    initialData: () => getCategoriesFromCache() ?? undefined,
+    initialDataUpdatedAt: 0,
     staleTime: 10 * 60_000,
     gcTime: 24 * 60 * 60_000,
   })
@@ -41,7 +71,19 @@ function useCategories() {
 function useTables() {
   return useQuery({
     queryKey: ['tables'],
-    queryFn: () => api.get<{ data: Table[] }>('/api/tenant/tables').then((r) => r.data),
+    queryFn: async () => {
+      try {
+        const data = await api.get<{ data: Table[] }>('/api/tenant/tables').then((r) => r.data)
+        saveTablesToCache(data)
+        return data
+      } catch {
+        const cached = getTablesFromCache()
+        if (cached) return cached
+        throw new Error('Sin conexión y sin datos guardados')
+      }
+    },
+    initialData: () => getTablesFromCache() ?? undefined,
+    initialDataUpdatedAt: 0,
     staleTime: 60_000,
     gcTime: 24 * 60 * 60_000,
   })
@@ -638,10 +680,64 @@ function CartModal({ visible, onClose, tables }: {
       qc.invalidateQueries({ queryKey: ['kitchen'] })
       router.push('/(tabs)/pedidos')
     } catch (err: any) {
-      const isNetworkError = !isConnected || err?.message?.includes('Network request failed') || err?.message?.includes('fetch')
+      const isNetworkError = !isConnected || (err as any)?.status === 0 || err?.message?.includes('Network request failed') || err?.message?.includes('fetch')
       if (isNetworkError) {
         saveOfflineOrder(localId, orderPayload)
         enqueueSync('create_order', orderPayload)
+
+        // Crear pedido temporal en caché para que aparezca en pedidos sin internet
+        const approxTotal = items.reduce((sum: number, i: any) => {
+          const modDelta = (i.modifiers ?? []).reduce((ms: number, m: any) => ms + (m.priceDelta ?? 0), 0)
+          return sum + (i.unitPrice + modDelta) * i.quantity
+        }, 0) + (isDelivery ? deliveryFeeNum : 0)
+
+        const tempOrder: Order = {
+          id: localId,
+          localId,
+          displayCode: null,
+          type: orderType,
+          status: 'sent',
+          tableId: orderType === 'table' && tableId ? tableId : null,
+          tableName: null,
+          customerName: customerName || null,
+          customerPhone: null,
+          customerAddress: null,
+          customerNotes: null,
+          notes: notes || null,
+          subtotal: String(approxTotal),
+          taxAmount: '0',
+          tipAmount: '0',
+          deliveryFee: String(isDelivery ? deliveryFeeNum : 0),
+          discountAmount: '0',
+          total: String(approxTotal),
+          paymentStatus: 'pending',
+          paymentMethod: null,
+          paymentNotes: null,
+          servedBy: null,
+          closedBy: null,
+          cancelReason: null,
+          createdAt: new Date().toISOString(),
+          updatedAt: null,
+          closedAt: null,
+          items: items.map((i: any, idx: number): OrderItem => ({
+            id: `${localId}_${idx}`,
+            productId: i.productId ?? null,
+            quantity: i.quantity,
+            notes: i.notes || null,
+            unitPrice: String(i.unitPrice),
+            itemTotal: String(i.unitPrice * i.quantity),
+            status: 'pending',
+            productSnapshot: { name: i.name, price: String(i.unitPrice) },
+            modifierSnapshot: (i.modifiers ?? []).map((m: any) => ({
+              groupName: m.groupName,
+              modifierName: m.modifierName,
+              priceDelta: String(m.priceDelta ?? 0),
+            })),
+          })),
+        }
+        upsertOrderInCache(tempOrder, true)
+        qc.setQueryData<Order[]>(['orders', 'active'], (old = []) => [tempOrder, ...old])
+
         clearCart()
         onClose()
         // Sin conexión: navega igual a pedidos; el banner offline informa al usuario
@@ -1009,8 +1105,8 @@ export default function PosScreen() {
     return <View style={ps.centered}><ActivityIndicator size="large" color={PRIMARY} /></View>
   }
 
-  if (errorProds) {
-    return <ErrorView message="No se pudieron cargar los productos." onRetry={refetchProds} />
+  if (errorProds && !_products) {
+    return <ErrorView message="Sin conexión y sin datos guardados. Conecta a internet para continuar." onRetry={refetchProds} />
   }
 
   const showCategories = !isSearchMode && !categoryId

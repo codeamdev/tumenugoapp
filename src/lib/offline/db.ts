@@ -20,6 +20,23 @@ export function getDb(): SQLite.SQLiteDatabase {
         data       TEXT    NOT NULL,
         created_at INTEGER NOT NULL
       );
+      CREATE TABLE IF NOT EXISTS cache_products (
+        id   TEXT PRIMARY KEY,
+        data TEXT NOT NULL
+      );
+      CREATE TABLE IF NOT EXISTS cache_categories (
+        id   TEXT PRIMARY KEY,
+        data TEXT NOT NULL
+      );
+      CREATE TABLE IF NOT EXISTS cache_tables (
+        id   TEXT PRIMARY KEY,
+        data TEXT NOT NULL
+      );
+      CREATE TABLE IF NOT EXISTS cache_orders (
+        id       TEXT    PRIMARY KEY,
+        data     TEXT    NOT NULL,
+        is_local INTEGER NOT NULL DEFAULT 0
+      );
     `)
   }
   return _db

@@ -1,5 +1,6 @@
 import { api } from '@/lib/api'
 import { getDb } from './db'
+import { removeOrderFromCache } from './cache'
 
 export type SyncOpType =
   | 'create_order'
@@ -121,9 +122,12 @@ async function processSyncItem(item: SyncItem): Promise<void> {
         '/api/tenant/orders',
         item.payload,
       )
-      // Remove from offline_orders once synced
+      // Remove from offline_orders and local cache once synced
       const localId = (item.payload.localId as string) ?? result.data?.localId
-      if (localId) removeOfflineOrder(localId)
+      if (localId) {
+        removeOfflineOrder(localId)
+        removeOrderFromCache(localId)
+      }
       break
     }
 

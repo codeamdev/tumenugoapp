@@ -11,6 +11,7 @@ import { api } from '@/lib/api'
 import { formatCurrency, formatDateTime } from '@/lib/utils'
 import { useAuthStore } from '@/stores/auth-store'
 import { enqueueSync } from '@/lib/offline/sync-queue'
+import { saveActiveOrdersToCache, getActiveOrdersFromCache, removeOrderFromCache } from '@/lib/offline/cache'
 import { useNetworkStatus } from '@/hooks/use-network'
 import { ErrorView } from '@/components/ErrorView'
 import { useAppColors } from '@/lib/theme'
@@ -98,6 +99,8 @@ function PayModal({ order, onClose, onRefresh }: {
   const c = useAppColors()
   const s = makePayStyles(c)
   const { tenant, config } = useAuthStore()
+  const { isConnected } = useNetworkStatus()
+  const qc = useQueryClient()
   const PRIMARY = tenant?.primaryColor ?? '#2563eb'
   const sign    = tenant?.currencySign ?? '$'
   const methods = config?.paymentMethods ?? [{ key: 'cash', label: 'Efectivo' }]
@@ -151,7 +154,21 @@ function PayModal({ order, onClose, onRefresh }: {
       onRefresh()
       onClose()
     } catch (err: any) {
-      Alert.alert('Error', err.message)
+      const isNetErr = !isConnected || (err as any)?.status === 0 || err?.message === 'Sin conexión'
+      if (isNetErr) {
+        enqueueSync('update_order_status', {
+          orderId: order.id,
+          action: 'close',
+          payments: validPayments,
+          customerName: isCredit ? customerName.trim() : undefined,
+        })
+        removeOrderFromCache(order.id)
+        qc.setQueryData<Order[]>(['orders', 'active'], (old = []) => old.filter((o) => o.id !== order.id))
+        onClose()
+        Alert.alert('Sin conexión', 'El cobro se registrará automáticamente al reconectar.')
+      } else {
+        Alert.alert('Error', err.message)
+      }
     } finally { setLoading(false) }
   }
 
@@ -721,7 +738,19 @@ export default function PedidosScreen() {
 
   const activeQuery = useQuery({
     queryKey: ['orders', 'active'],
-    queryFn: () => api.get<{ data: Order[] }>('/api/tenant/orders').then((r) => r.data ?? []),
+    queryFn: async () => {
+      try {
+        const orders = await api.get<{ data: Order[] }>('/api/tenant/orders').then((r) => r.data ?? [])
+        saveActiveOrdersToCache(orders)
+        return orders
+      } catch {
+        const cached = getActiveOrdersFromCache()
+        if (cached) return cached
+        throw new Error('Sin conexión y sin datos guardados')
+      }
+    },
+    initialData: () => getActiveOrdersFromCache() ?? undefined,
+    initialDataUpdatedAt: 0,
     refetchInterval: 15_000,
     refetchIntervalInBackground: false,
     enabled: mode === 'active',
@@ -822,8 +851,8 @@ export default function PedidosScreen() {
 
       {isLoading
         ? <View style={s.centered}><ActivityIndicator size="large" color={PRIMARY} /></View>
-        : isError
-        ? <ErrorView message="No se pudieron cargar los pedidos." onRetry={refetch} />
+        : (isError && activeOrders.length === 0 && mode === 'active')
+        ? <ErrorView message="Sin conexión y sin datos guardados. Conecta a internet para continuar." onRetry={refetch} />
         : (
           <FlatList
             data={filtered}

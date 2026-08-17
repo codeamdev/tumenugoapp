@@ -9,6 +9,7 @@ import { api } from '@/lib/api'
 import { formatDateTime } from '@/lib/utils'
 import { useAuthStore } from '@/stores/auth-store'
 import { enqueueSync } from '@/lib/offline/sync-queue'
+import { saveKitchenOrdersToCache, getKitchenOrdersFromCache, updateOrderStatusInCache, upsertOrderInCache, removeOrderFromCache } from '@/lib/offline/cache'
 import { useNetworkStatus } from '@/hooks/use-network'
 import { ErrorView } from '@/components/ErrorView'
 import { useAppColors } from '@/lib/theme'
@@ -49,23 +50,36 @@ function KitchenCard({ order, onUpdate, alertMinutes }: { order: Order; onUpdate
   }, [isLate])
 
   async function advance(status: string) {
-    // Optimistic update: preparing changes the dot color; ready removes the card
+    // Optimistic update TanStack Query
     qc.setQueryData<Order[]>(['kitchen'], (old = []) =>
       status === 'ready'
         ? old.filter((o) => o.id !== order.id)
         : old.map((o) => o.id === order.id ? { ...o, status: status as Order['status'] } : o)
     )
+    // Optimistic update SQLite
+    if (status === 'ready') {
+      removeOrderFromCache(order.id)
+    } else {
+      updateOrderStatusInCache(order.id, status as Order['status'])
+    }
+
     try {
       await api.patch(`/api/tenant/orders/${order.id}`, { status })
       onUpdate()
     } catch (err: any) {
-      // Rollback
-      qc.invalidateQueries({ queryKey: ['kitchen'] })
-      const isNetErr = !isConnected || err?.message?.includes('Network request failed')
+      const isNetErr = !isConnected || (err as any)?.status === 0 || err?.message?.includes('Network request failed')
       if (isNetErr) {
         enqueueSync('update_order_status', { orderId: order.id, status })
         Alert.alert('Sin conexión', 'El cambio se sincronizará al reconectar.')
+        // Mantener cambios optimistas (TQ + SQLite)
       } else {
+        // Error de servidor: revertir ambos
+        qc.setQueryData<Order[]>(['kitchen'], (old = []) =>
+          status === 'ready'
+            ? [...(old ?? []), order]
+            : (old ?? []).map((o) => o.id === order.id ? order : o)
+        )
+        upsertOrderInCache(order)
         Alert.alert('Error', err.message)
       }
     }
@@ -148,7 +162,19 @@ export default function CocinaScreen() {
 
   const { data, isLoading, isError, isRefetching, refetch } = useQuery({
     queryKey: ['kitchen'],
-    queryFn: () => api.get<{ data: Order[] }>('/api/tenant/kitchen').then((r) => r.data ?? []),
+    queryFn: async () => {
+      try {
+        const orders = await api.get<{ data: Order[] }>('/api/tenant/kitchen').then((r) => r.data ?? [])
+        saveKitchenOrdersToCache(orders)
+        return orders
+      } catch {
+        const cached = getKitchenOrdersFromCache()
+        if (cached) return cached
+        throw new Error('Sin conexión y sin datos guardados')
+      }
+    },
+    initialData: () => getKitchenOrdersFromCache() ?? undefined,
+    initialDataUpdatedAt: 0,
     refetchInterval: 5_000,
     refetchIntervalInBackground: false,
   })
@@ -168,8 +194,8 @@ export default function CocinaScreen() {
     return <View style={styles.centered}><ActivityIndicator size="large" color={PRIMARY} /></View>
   }
 
-  if (isError) {
-    return <ErrorView message="No se pudieron cargar los pedidos de cocina." onRetry={refetch} />
+  if (isError && !orders.length) {
+    return <ErrorView message="Sin conexión y sin datos guardados. Conecta a internet para continuar." onRetry={refetch} />
   }
 
   return (
