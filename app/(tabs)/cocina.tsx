@@ -35,7 +35,7 @@ function KitchenCard({ order, onUpdate, alertMinutes }: { order: Order; onUpdate
     : null
 
   const isUrgent = elapsedMin !== null && elapsedMin >= 15
-  const isLate   = isPreparing && alertMinutes > 0 && elapsedMin !== null && elapsedMin >= alertMinutes
+  const isLate   = (isSent || isPreparing) && alertMinutes > 0 && elapsedMin !== null && elapsedMin >= alertMinutes
 
   const blinkAnim = useRef(new Animated.Value(1)).current
   useEffect(() => {
@@ -201,16 +201,18 @@ export default function CocinaScreen() {
   const preparing = orders.filter((o) => o.status === 'preparing')
   const all      = [...sent, ...preparing]
 
-  // Vibrar cuando llegan pedidos nuevos a cocina
+  // Sonar cuando llegan pedidos nuevos a cocina
   const knownOrderIds = useRef(new Set<string>())
+  const initialLoadDone = useRef(false)
   useEffect(() => {
     if (!data) return
     const currentIds = new Set(data.map((o) => o.id))
-    if (knownOrderIds.current.size > 0 && [...currentIds].some((id) => !knownOrderIds.current.has(id))) {
+    if (initialLoadDone.current && [...currentIds].some((id) => !knownOrderIds.current.has(id))) {
       playBeep()
       Vibration.vibrate([0, 200, 100, 200])
     }
     knownOrderIds.current = currentIds
+    initialLoadDone.current = true
   }, [data])
 
   function onUpdate() {
