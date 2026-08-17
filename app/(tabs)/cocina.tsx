@@ -6,6 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Ionicons } from '@expo/vector-icons'
 import { api } from '@/lib/api'
+import { playBeep } from '@/lib/beep'
 import { formatDateTime } from '@/lib/utils'
 import { useAuthStore } from '@/stores/auth-store'
 import { enqueueSync } from '@/lib/offline/sync-queue'
@@ -52,6 +53,7 @@ function KitchenCard({ order, onUpdate, alertMinutes }: { order: Order; onUpdate
   const wasLate = useRef(false)
   useEffect(() => {
     if (isLate && !wasLate.current) {
+      playBeep()
       Vibration.vibrate([0, 300, 200, 300])
       wasLate.current = true
     }
@@ -205,6 +207,7 @@ export default function CocinaScreen() {
     if (!data) return
     const currentIds = new Set(data.map((o) => o.id))
     if (knownOrderIds.current.size > 0 && [...currentIds].some((id) => !knownOrderIds.current.has(id))) {
+      playBeep()
       Vibration.vibrate([0, 200, 100, 200])
     }
     knownOrderIds.current = currentIds
