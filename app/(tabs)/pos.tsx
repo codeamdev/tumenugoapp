@@ -752,7 +752,7 @@ function CartModal({ visible, onClose, tables }: {
 
   const ORDER_TYPES: { key: 'table' | 'bar' | 'delivery'; label: string }[] = [
     { key: 'table', label: 'Mesa' },
-    { key: 'bar',   label: 'Barra' },
+    ...(config?.barEnabled ? [{ key: 'bar' as const, label: 'Barra' }] : []),
     { key: 'delivery', label: 'Domicilio' },
   ]
 

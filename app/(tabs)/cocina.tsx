@@ -106,12 +106,10 @@ function KitchenCard({ order, onUpdate, alertMinutes }: { order: Order; onUpdate
       <View style={styles.cardTop}>
         <View>
           <Text style={styles.cardId}>{order.displayCode ?? '#' + order.id.slice(-6).toUpperCase()}</Text>
-          {order.tableName    && <Text style={styles.cardSub}>{order.tableName}</Text>}
           {order.customerName && <Text style={styles.cardSub}>{order.customerName}</Text>}
         </View>
         <View style={{ alignItems: 'flex-end' }}>
           <View style={[styles.dot, isSent ? styles.dotSent : styles.dotPreparing]} />
-          {timeRef && <Text style={styles.cardTime}>{formatDateTime(timeRef)}</Text>}
           {elapsedMin !== null && (
             <Text style={[styles.elapsed, isUrgent && styles.elapsedUrgent]}>
               {elapsedMin} min
