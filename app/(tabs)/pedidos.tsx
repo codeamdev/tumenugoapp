@@ -109,6 +109,7 @@ function PayModal({ order, onClose, onRefresh }: {
 
   const [payments, setPayments] = useState<PaymentRow[]>([{ method: methods[0]?.key ?? 'cash', amount: '' }])
   const [customerName, setCustomerName] = useState(order.customerName ?? '')
+  const [paymentNotes, setPaymentNotes] = useState('')
   const [loading, setLoading]   = useState(false)
 
   const grandTotal = orderTotal
@@ -116,11 +117,23 @@ function PayModal({ order, onClose, onRefresh }: {
   const remaining  = grandTotal - totalPaid
   const isCredit   = !!(methods.find((m) => m.key === payments[0]?.method)?.isCredit)
 
-  // Botones de monto rápido (en miles de la divisa local)
   const QUICK_AMOUNTS = [10000, 20000, 50000, 100000]
 
+  // Auto-fill total when switching to credit method
+  useEffect(() => {
+    if (isCredit) {
+      setPayments((prev) => [{ method: prev[0]?.method, amount: String(Math.round(orderTotal)) }])
+    }
+  }, [isCredit, orderTotal])
+
+  function fmtNum(raw: string) {
+    const n = raw.replace(/\D/g, '')
+    return n ? parseInt(n, 10).toLocaleString('es-CO') : ''
+  }
+
   function updateRow(idx: number, field: keyof PaymentRow, value: string) {
-    setPayments((prev) => prev.map((p, i) => i === idx ? { ...p, [field]: value } : p))
+    const stored = field === 'amount' ? value.replace(/\D/g, '') : value
+    setPayments((prev) => prev.map((p, i) => i === idx ? { ...p, [field]: stored } : p))
   }
 
   function addRow() {
@@ -136,12 +149,20 @@ function PayModal({ order, onClose, onRefresh }: {
       .map((p) => ({ method: p.method, amount: parseFloat(p.amount) || 0 }))
       .filter((p) => p.amount > 0)
 
-    if (validPayments.length === 0) {
+    if (validPayments.length === 0 && !isCredit) {
       Alert.alert('Sin monto', 'Ingresa al menos un monto de pago.')
       return
     }
-    if (totalPaid < grandTotal - 0.01) {
+    if (!isCredit && totalPaid < grandTotal - 0.01) {
       Alert.alert('Monto insuficiente', `Faltan ${formatCurrency(remaining, sign)} por cubrir.`)
+      return
+    }
+    if (isCredit && !customerName.trim()) {
+      Alert.alert('Nombre requerido', 'Ingresa el nombre del cliente para el fiado.')
+      return
+    }
+    if (isCredit && !paymentNotes.trim()) {
+      Alert.alert('Observación requerida', 'Ingresa las observaciones para el fiado.')
       return
     }
     setLoading(true)
@@ -150,6 +171,7 @@ function PayModal({ order, onClose, onRefresh }: {
         action: 'close',
         payments: validPayments,
         customerName: isCredit ? customerName.trim() : undefined,
+        paymentNotes: isCredit ? paymentNotes.trim() : undefined,
       })
       onRefresh()
       onClose()
@@ -217,51 +239,62 @@ function PayModal({ order, onClose, onRefresh }: {
                       </TouchableOpacity>
                     ))}
                   </ScrollView>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8 }}>
-                    <TextInput
-                      style={[s.payInput, { flex: 1 }]}
-                      keyboardType="numeric"
-                      placeholder={`Monto (${sign})`}
-                      placeholderTextColor={c.textMuted}
-                      value={row.amount}
-                      onChangeText={(v) => updateRow(idx, 'amount', v)}
-                    />
-                    {payments.length > 1 && (
-                      <TouchableOpacity onPress={() => removeRow(idx)} style={s.removePayBtn}>
-                        <Ionicons name="trash-outline" size={18} color={c.danger} />
-                      </TouchableOpacity>
-                    )}
-                  </View>
+                  {isCredit ? (
+                    <View style={{ marginTop: 8, padding: 10, backgroundColor: c.surfaceAlt, borderRadius: 10, borderWidth: 1, borderColor: c.border }}>
+                      <Text style={{ fontSize: 14, color: c.textSecondary }}>Total a registrar como deuda:</Text>
+                      <Text style={{ fontSize: 20, fontWeight: '800', color: c.text, marginTop: 2 }}>{formatCurrency(grandTotal, sign)}</Text>
+                    </View>
+                  ) : (
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8 }}>
+                      <TextInput
+                        style={[s.payInput, { flex: 1 }]}
+                        keyboardType="numeric"
+                        placeholder={`Monto (${sign})`}
+                        placeholderTextColor={c.textMuted}
+                        value={fmtNum(row.amount)}
+                        onChangeText={(v) => updateRow(idx, 'amount', v)}
+                      />
+                      {payments.length > 1 && (
+                        <TouchableOpacity onPress={() => removeRow(idx)} style={s.removePayBtn}>
+                          <Ionicons name="trash-outline" size={18} color={c.danger} />
+                        </TouchableOpacity>
+                      )}
+                    </View>
+                  )}
                 </View>
               ))}
 
-              <TouchableOpacity style={[s.addPayBtn, { borderColor: PRIMARY }]} onPress={addRow}>
-                <Ionicons name="add-circle-outline" size={16} color={PRIMARY} />
-                <Text style={[s.addPayBtnText, { color: PRIMARY }]}>Agregar método</Text>
-              </TouchableOpacity>
+              {!isCredit && (
+                <TouchableOpacity style={[s.addPayBtn, { borderColor: PRIMARY }]} onPress={addRow}>
+                  <Ionicons name="add-circle-outline" size={16} color={PRIMARY} />
+                  <Text style={[s.addPayBtnText, { color: PRIMARY }]}>Agregar método</Text>
+                </TouchableOpacity>
+              )}
             </View>
 
-            {/* Botones de monto rápido */}
-            <View style={{ gap: 6 }}>
-              <Text style={s.payLabel}>Monto rápido</Text>
-              <View style={s.quickRow}>
-                {QUICK_AMOUNTS.map((amt) => (
+            {/* Botones de monto rápido (ocultos para crédito) */}
+            {!isCredit && (
+              <View style={{ gap: 6 }}>
+                <Text style={s.payLabel}>Monto rápido</Text>
+                <View style={s.quickRow}>
+                  {QUICK_AMOUNTS.map((amt) => (
+                    <TouchableOpacity
+                      key={amt}
+                      style={[s.quickBtn, { borderColor: PRIMARY }]}
+                      onPress={() => updateRow(0, 'amount', String(amt))}
+                    >
+                      <Text style={[s.quickBtnText, { color: PRIMARY }]}>+{amt >= 1000 ? `${amt / 1000}k` : amt}</Text>
+                    </TouchableOpacity>
+                  ))}
                   <TouchableOpacity
-                    key={amt}
-                    style={[s.quickBtn, { borderColor: PRIMARY }]}
-                    onPress={() => updateRow(0, 'amount', String(amt))}
+                    style={[s.quickBtn, { borderColor: PRIMARY, backgroundColor: PRIMARY + '18' }]}
+                    onPress={() => updateRow(0, 'amount', String(Math.round(grandTotal)))}
                   >
-                    <Text style={[s.quickBtnText, { color: PRIMARY }]}>+{amt >= 1000 ? `${amt / 1000}k` : amt}</Text>
+                    <Text style={[s.quickBtnText, { color: PRIMARY }]}>Exacto</Text>
                   </TouchableOpacity>
-                ))}
-                <TouchableOpacity
-                  style={[s.quickBtn, { borderColor: PRIMARY, backgroundColor: PRIMARY + '18' }]}
-                  onPress={() => updateRow(0, 'amount', String(grandTotal))}
-                >
-                  <Text style={[s.quickBtnText, { color: PRIMARY }]}>Exacto</Text>
-                </TouchableOpacity>
+                </View>
               </View>
-            </View>
+            )}
 
             {/* Resumen de cobro */}
             {totalPaid > 0 && (
@@ -275,29 +308,42 @@ function PayModal({ order, onClose, onRefresh }: {
               </View>
             )}
 
-            {/* Nombre — solo para crédito/fiado */}
+            {/* Nombre + Observaciones — solo para crédito/fiado */}
             {isCredit && (
-              <View style={{ gap: 8 }}>
-                <Text style={s.payLabel}>Nombre del cliente *</Text>
-                <TextInput
-                  style={s.payInput}
-                  placeholder="Nombre completo de quien debe"
-                  placeholderTextColor={c.textMuted}
-                  value={customerName}
-                  onChangeText={setCustomerName}
-                  autoCapitalize="words"
-                />
-              </View>
+              <>
+                <View style={{ gap: 8 }}>
+                  <Text style={s.payLabel}>Nombre del cliente *</Text>
+                  <TextInput
+                    style={s.payInput}
+                    placeholder="Nombre completo de quien debe"
+                    placeholderTextColor={c.textMuted}
+                    value={customerName}
+                    onChangeText={setCustomerName}
+                    autoCapitalize="words"
+                  />
+                </View>
+                <View style={{ gap: 8 }}>
+                  <Text style={s.payLabel}>Observaciones *</Text>
+                  <TextInput
+                    style={[s.payInput, { minHeight: 70, textAlignVertical: 'top' }]}
+                    placeholder="Motivo, plazo de pago, referencia..."
+                    placeholderTextColor={c.textMuted}
+                    value={paymentNotes}
+                    onChangeText={setPaymentNotes}
+                    multiline
+                  />
+                </View>
+              </>
             )}
 
             <TouchableOpacity
               style={[
                 s.confirmBtn,
                 { backgroundColor: isCredit ? '#d97706' : PRIMARY },
-                (loading || (isCredit && !customerName.trim())) && s.btnDisabled,
+                (loading || (isCredit && (!customerName.trim() || !paymentNotes.trim()))) && s.btnDisabled,
               ]}
               onPress={confirm}
-              disabled={loading || (isCredit && !customerName.trim())}
+              disabled={loading || (isCredit && (!customerName.trim() || !paymentNotes.trim()))}
             >
               {loading
                 ? <ActivityIndicator color={c.textInverse} />

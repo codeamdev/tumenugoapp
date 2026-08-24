@@ -127,6 +127,10 @@ function CloseModal({ visible, expected, sign, byPaymentMethod, labels, onClose,
       Alert.alert('Sin conexión', 'Las operaciones de caja requieren conexión a internet.')
       return
     }
+    if (counted !== '' && Math.abs(diff) > 0.01 && !notes.trim()) {
+      Alert.alert('Observación requerida', 'Debes ingresar una observación cuando hay diferencia en el arqueo.')
+      return
+    }
     setLoading(true)
     try {
       await api.post('/api/tenant/caja', {
@@ -183,8 +187,8 @@ function CloseModal({ visible, expected, sign, byPaymentMethod, labels, onClose,
             keyboardType="numeric"
             placeholder="0"
             placeholderTextColor={c.textMuted}
-            value={counted}
-            onChangeText={setCounted}
+            value={counted ? parseInt(counted, 10).toLocaleString('es-CO') : ''}
+            onChangeText={(text) => setCounted(text.replace(/\D/g, ''))}
           />
 
           {counted !== '' && (
@@ -196,10 +200,12 @@ function CloseModal({ visible, expected, sign, byPaymentMethod, labels, onClose,
             </View>
           )}
 
-          <Text style={styles.label}>Notas (opcional)</Text>
+          <Text style={styles.label}>
+            Notas{counted !== '' && Math.abs(diff) > 0.01 ? ' *' : ' (opcional)'}
+          </Text>
           <TextInput
             style={[styles.input, styles.inputMulti]}
-            placeholder="Observaciones del arqueo..."
+            placeholder={counted !== '' && Math.abs(diff) > 0.01 ? 'Explica la diferencia...' : 'Observaciones del arqueo...'}
             placeholderTextColor={c.textMuted}
             value={notes}
             onChangeText={setNotes}

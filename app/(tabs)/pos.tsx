@@ -328,9 +328,6 @@ function ProductRow({ product, onPress, PRIMARY, sign, c }: {
         ? null
         : <Text style={[rStyles.price, { color: PRIMARY }]}>{formatCurrency(parseFloat(product.price), sign)}</Text>
       }
-      <View style={[rStyles.addBtn, { backgroundColor: outOfStock ? '#fee2e2' : PRIMARY + '18' }]}>
-        <Ionicons name={outOfStock ? 'close' : 'add'} size={20} color={outOfStock ? '#ef4444' : PRIMARY} />
-      </View>
     </TouchableOpacity>
   )
 }
@@ -342,7 +339,6 @@ const rStyles = StyleSheet.create({
   sub:    { fontSize: 12, marginTop: 2 },
   outTag: { fontSize: 11, fontWeight: '700', color: '#ef4444', marginTop: 2 },
   price:  { fontSize: 14, fontWeight: '700', minWidth: 64, textAlign: 'right' },
-  addBtn: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
 })
 
 // ─── Tarjeta de categoría ─────────────────────────────────────────────────────

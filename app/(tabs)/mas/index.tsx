@@ -24,6 +24,7 @@ interface MenuItem {
 const MENU: MenuItem[] = [
   { icon: 'grid-outline',        label: 'Mesas',          desc: 'Estado y asignación de mesas',    route: '/mas/mesas',          color: '#6366f1' },
   { icon: 'bar-chart-outline',   label: 'Informes',       desc: 'Ventas, pedidos y estadísticas',  route: '/mas/informes',       roles: ['admin', 'cajero'], color: '#10b981' },
+  { icon: 'document-text-outline', label: 'Cierres',      desc: 'Historial de cierres de caja',   route: '/mas/cierres',        roles: ['admin', 'cajero'], color: '#0891b2' },
   { icon: 'fast-food-outline',   label: 'Productos',      desc: 'Disponibilidad del catálogo',     route: '/mas/productos',      roles: ['admin', 'cajero'], color: '#f59e0b' },
   { icon: 'people-outline',      label: 'Usuarios',       desc: 'Gestión de empleados',            route: '/mas/usuarios',       roles: ['admin'], color: '#ef4444' },
   { icon: 'settings-outline',    label: 'Configuración',  desc: 'Personalización del negocio',     route: '/mas/configuracion',  roles: ['admin'], color: '#8b5cf6' },

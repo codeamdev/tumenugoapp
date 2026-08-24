@@ -300,9 +300,6 @@ function ProdRow({ product, onPress }: { product: Product; onPress: () => void }
         }
       </View>
       {!outOfStock && <Text style={[s.prodPrice, { color: PRIMARY }]}>{formatCurrency(parseFloat(product.price), sign)}</Text>}
-      <View style={[s.prodAddIcon, { backgroundColor: PRIMARY + '18' }]}>
-        <Ionicons name="add" size={20} color={PRIMARY} />
-      </View>
     </TouchableOpacity>
   )
 }
@@ -561,7 +558,6 @@ const s = StyleSheet.create({
   prodName:    { fontSize: 15, fontWeight: '600' },
   prodSub:     { fontSize: 12, marginTop: 2 },
   prodPrice:   { fontSize: 14, fontWeight: '700', minWidth: 64, textAlign: 'right' },
-  prodAddIcon: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
 
   footer:      { padding: 16, borderTopWidth: 1 },
   confirmBtn:  { borderRadius: 12, padding: 15, alignItems: 'center' },
