@@ -42,8 +42,8 @@ function KitchenCard({ order, onUpdate, alertMinutes }: { order: Order; onUpdate
     if (!isLate) { blinkAnim.setValue(1); return }
     const loop = Animated.loop(
       Animated.sequence([
-        Animated.timing(blinkAnim, { toValue: 0.25, duration: 450, useNativeDriver: true }),
-        Animated.timing(blinkAnim, { toValue: 1,    duration: 450, useNativeDriver: true }),
+        Animated.timing(blinkAnim, { toValue: 0,  duration: 400, useNativeDriver: true }),
+        Animated.timing(blinkAnim, { toValue: 1,  duration: 400, useNativeDriver: true }),
       ])
     )
     loop.start()
