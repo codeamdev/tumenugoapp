@@ -22,7 +22,6 @@ const STATUS_CONFIG = {
 
 type TableStatus = keyof typeof STATUS_CONFIG
 
-const ZONES = ['Salón', 'Terraza', 'Barra', 'VIP', 'Privado']
 
 function TableCard({
   table, isAdmin, onUpdate, onEdit, c,
@@ -108,8 +107,10 @@ function TableCard({
     >
       <View style={{ flex: 1 }}>
         <Text style={s.tableName}>{table.name}</Text>
-        {table.zone ? <Text style={s.tableSub}>{table.zone}</Text> : null}
-        {table.capacity ? <Text style={s.tableSub}>{table.capacity} personas</Text> : null}
+        {table.zone === 'Barra'
+          ? <Text style={s.tableSub}>Barra</Text>
+          : table.capacity ? <Text style={s.tableSub}>{table.capacity} personas</Text> : null
+        }
       </View>
       <View style={[s.badge, { backgroundColor: cfg.bg }]}>
         <Text style={[s.badgeText, { color: cfg.color }]}>{cfg.label}</Text>
@@ -134,7 +135,7 @@ export default function MesasScreen() {
 
   const [showModal, setShowModal]     = useState(false)
   const [editing, setEditing]         = useState<Table | null>(null)
-  const [form, setForm]               = useState({ name: '', capacity: '4', zone: 'Salón' })
+  const [form, setForm]               = useState({ name: '', capacity: '4', isBar: false })
   const [saving, setSaving]           = useState(false)
 
   const { data, isLoading, isRefetching, refetch } = useQuery({
@@ -152,7 +153,7 @@ export default function MesasScreen() {
 
   function openCreate() {
     setEditing(null)
-    setForm({ name: '', capacity: '4', zone: 'Salón' })
+    setForm({ name: '', capacity: '4', isBar: false })
     setShowModal(true)
   }
 
@@ -161,7 +162,7 @@ export default function MesasScreen() {
     setForm({
       name:     t.name,
       capacity: String(t.capacity ?? 4),
-      zone:     t.zone ?? 'Salón',
+      isBar:    t.zone === 'Barra',
     })
     setShowModal(true)
   }
@@ -171,7 +172,7 @@ export default function MesasScreen() {
     const cap = parseInt(form.capacity)
     if (isNaN(cap) || cap < 1) { Alert.alert('Error', 'Capacidad inválida'); return }
 
-    const body = { name: form.name.trim(), capacity: cap, zone: form.zone }
+    const body = { name: form.name.trim(), capacity: cap, isBar: form.isBar }
     setShowModal(false)
 
     if (editing) {
@@ -308,28 +309,15 @@ export default function MesasScreen() {
                 keyboardType="number-pad"
               />
 
-              <Text style={[s.fieldLabel, { color: c.textSecondary, marginTop: 16 }]}>Zona</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 4 }} contentContainerStyle={{ gap: 8 }}>
-                {ZONES.map((z) => {
-                  const sel = form.zone === z
-                  return (
-                    <TouchableOpacity
-                      key={z}
-                      style={[s.chip, { borderColor: sel ? PRIMARY : c.border, backgroundColor: sel ? PRIMARY : c.surfaceAlt }]}
-                      onPress={() => setForm((f) => ({ ...f, zone: z }))}
-                    >
-                      <Text style={[s.chipText, { color: sel ? '#fff' : c.textSecondary }]}>{z}</Text>
-                    </TouchableOpacity>
-                  )
-                })}
-              </ScrollView>
-              <TextInput
-                style={[s.fieldInput, { color: c.text, borderColor: c.border, backgroundColor: c.surfaceAlt, marginTop: 8 }]}
-                placeholder="O escribe una zona personalizada"
-                placeholderTextColor={c.textMuted}
-                value={form.zone}
-                onChangeText={(v) => setForm((f) => ({ ...f, zone: v }))}
-              />
+              <Text style={[s.fieldLabel, { color: c.textSecondary, marginTop: 16 }]}>Tipo</Text>
+              <TouchableOpacity
+                style={[s.chip, { borderColor: form.isBar ? '#f59e0b' : c.border, backgroundColor: form.isBar ? '#fffbeb' : c.surfaceAlt, alignSelf: 'flex-start' }]}
+                onPress={() => setForm((f) => ({ ...f, isBar: !f.isBar }))}
+              >
+                <Text style={[s.chipText, { color: form.isBar ? '#b45309' : c.textSecondary }]}>
+                  {form.isBar ? '✓ Barra (siempre disponible)' : 'Mesa normal'}
+                </Text>
+              </TouchableOpacity>
 
               <TouchableOpacity
                 style={[s.saveBtn, { backgroundColor: PRIMARY, marginTop: 32 }, saving && { opacity: 0.6 }]}

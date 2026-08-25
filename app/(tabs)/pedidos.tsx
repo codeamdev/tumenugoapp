@@ -47,7 +47,7 @@ function OrderRow({ order, onPress }: { order: Order; onPress: () => void }) {
   const sign  = tenant?.currencySign ?? '$'
 
   const origin = order.tableName
-    ? order.tableName
+    ? `Mesa ${order.tableName}`
     : ORDER_TYPE_LABELS[order.type] ?? order.type
 
   return (
