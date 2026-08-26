@@ -30,63 +30,10 @@ const ACTIVE_TABS: { key: OrderStatus | 'all'; label: string }[] = [
   { key: 'delivered', label: 'Entregado' },
 ]
 
-const HIST_TABS: { key: 'all' | 'closed' | 'cancelled'; label: string }[] = [
-  // 'all' = sólo cerrados (excluye cancelados, que van en su propio tab)
+const HIST_TABS: { key: 'all' | 'cancelled'; label: string }[] = [
   { key: 'all',       label: 'Completados' },
   { key: 'cancelled', label: 'Cancelados' },
 ]
-
-// ─── Fila de pedido ───────────────────────────────────────────────────────────
-
-function OrderRow({ order, onPress }: { order: Order; onPress: () => void }) {
-  const c = useAppColors()
-  const s = makeOrderRowStyles(c)
-  const { tenant } = useAuthStore()
-  const color = ORDER_STATUS_COLORS[order.status] ?? '#6b7280'
-  const label = ORDER_STATUS_LABELS[order.status] ?? order.status
-  const sign  = tenant?.currencySign ?? '$'
-
-  const origin = order.tableName
-    ? `Mesa ${order.tableName}`
-    : ORDER_TYPE_LABELS[order.type] ?? order.type
-
-  return (
-    <TouchableOpacity style={s.row} onPress={onPress} activeOpacity={0.75}>
-      <View style={{ flex: 1 }}>
-        <Text style={s.rowOrigin}>{origin}</Text>
-        <Text style={s.rowMeta}>
-          {order.displayCode ?? `#${order.id.slice(-6).toUpperCase()}`}
-          {order.customerName ? `  ·  ${order.customerName}` : ''}
-          {order.createdAt ? `  ·  ${formatDateTime(order.createdAt)}` : ''}
-        </Text>
-        <Text style={s.rowItems}>{(order as any).itemsCount ?? order.items?.length ?? 0} producto(s)</Text>
-      </View>
-      <View style={{ alignItems: 'flex-end', gap: 6 }}>
-        <Text style={s.rowTotal}>{formatCurrency(parseFloat(order.total), sign)}</Text>
-        <View style={[s.badge, { backgroundColor: color + '22' }]}>
-          <Text style={[s.badgeText, { color }]}>{label}</Text>
-        </View>
-      </View>
-    </TouchableOpacity>
-  )
-}
-
-function makeOrderRowStyles(c: ReturnType<typeof useAppColors>) {
-  return StyleSheet.create({
-    row: {
-      flexDirection: 'row', backgroundColor: c.surface,
-      marginHorizontal: 12, marginTop: 10, borderRadius: 12, padding: 14,
-      shadowColor: c.shadow, shadowOpacity: 0.04, shadowRadius: 6, elevation: 2,
-    },
-    rowOrigin:{ fontSize: 16, fontWeight: '700', color: c.text },
-    rowId:    { fontSize: 15, fontWeight: '700', color: c.text },
-    rowMeta:  { fontSize: 12, color: c.textMuted, marginTop: 2 },
-    rowItems: { fontSize: 12, color: c.textMuted, marginTop: 4 },
-    rowTotal: { fontSize: 15, fontWeight: '700', color: c.text },
-    badge:    { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 },
-    badgeText:{ fontSize: 11, fontWeight: '600' },
-  })
-}
 
 // ─── Modal: Cobrar pedido ─────────────────────────────────────────────────────
 
@@ -120,7 +67,6 @@ function PayModal({ order, onClose, onRefresh }: {
 
   const QUICK_AMOUNTS = [10000, 20000, 50000, 100000]
 
-  // Auto-fill total when switching to credit method
   useEffect(() => {
     if (isCredit) {
       setPayments((prev) => [{ method: prev[0]?.method, amount: String(Math.round(orderTotal)) }])
@@ -187,7 +133,7 @@ function PayModal({ order, onClose, onRefresh }: {
         })
         removeOrderFromCache(order.id)
         qc.setQueryData<Order[]>(['orders', 'active'], (old = []) => old.filter((o) => o.id !== order.id))
-        onClose() // OfflineBanner muestra el estado de sincronización pendiente
+        onClose()
       } else {
         Alert.alert('Error', err.message)
       }
@@ -209,7 +155,6 @@ function PayModal({ order, onClose, onRefresh }: {
         <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
           <ScrollView contentContainerStyle={{ padding: 20, gap: 16 }} keyboardShouldPersistTaps="handled">
 
-            {/* Totales */}
             <View style={[s.payTotal, { borderColor: PRIMARY + '40' }]}>
               <View style={{ flex: 1, gap: 4 }}>
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
@@ -217,140 +162,114 @@ function PayModal({ order, onClose, onRefresh }: {
                   <Text style={[s.payTotalLabel, { color: c.text }]}>{formatCurrency(orderTotal, sign)}</Text>
                 </View>
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 4, paddingTop: 4, borderTopWidth: 1, borderTopColor: PRIMARY + '30' }}>
-                  <Text style={[s.payTotalLabel, { fontWeight: '700' }]}>Total</Text>
-                  <Text style={[s.payTotalValue, { color: PRIMARY }]}>{formatCurrency(grandTotal, sign)}</Text>
+                  <Text style={[s.payTotalLabel, { fontWeight: '800', color: PRIMARY }]}>Recibido</Text>
+                  <Text style={[s.payTotalLabel, { fontWeight: '800', color: PRIMARY }]}>{formatCurrency(totalPaid, sign)}</Text>
                 </View>
+                {!isCredit && remaining > 0 && (
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                    <Text style={[s.payTotalLabel, { color: '#ef4444' }]}>Falta</Text>
+                    <Text style={[s.payTotalLabel, { color: '#ef4444' }]}>{formatCurrency(remaining, sign)}</Text>
+                  </View>
+                )}
+                {!isCredit && totalPaid > grandTotal && (
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                    <Text style={[s.payTotalLabel, { color: '#10b981' }]}>Cambio</Text>
+                    <Text style={[s.payTotalLabel, { color: '#10b981' }]}>{formatCurrency(totalPaid - grandTotal, sign)}</Text>
+                  </View>
+                )}
               </View>
             </View>
 
-            {/* Pagos */}
-            <View style={{ gap: 8 }}>
-              <Text style={s.payLabel}>Pagos</Text>
-              {payments.map((row, idx) => (
-                <View key={idx} style={s.payRow}>
-                  {/* Selector de método */}
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ maxHeight: 38 }} contentContainerStyle={{ gap: 6, paddingRight: 4 }}>
+            {payments.map((p, idx) => (
+              <View key={idx} style={s.payRow}>
+                <View style={[s.methodSelect, { borderColor: c.border, backgroundColor: c.surfaceAlt }]}>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6, padding: 4 }}>
                     {methods.map((m) => (
                       <TouchableOpacity
                         key={m.key}
-                        style={[s.methodChip, row.method === m.key && { backgroundColor: PRIMARY, borderColor: PRIMARY }]}
+                        style={[s.methodChip, p.method === m.key && { backgroundColor: PRIMARY }]}
                         onPress={() => updateRow(idx, 'method', m.key)}
                       >
-                        <Text style={[s.methodChipText, row.method === m.key && { color: c.textInverse }]}>{m.label}</Text>
+                        <Text style={[s.methodChipText, { color: p.method === m.key ? '#fff' : c.textSecondary }]}>{m.label}</Text>
                       </TouchableOpacity>
                     ))}
                   </ScrollView>
-                  {isCredit ? (
-                    <View style={{ marginTop: 8, padding: 10, backgroundColor: c.surfaceAlt, borderRadius: 10, borderWidth: 1, borderColor: c.border }}>
-                      <Text style={{ fontSize: 14, color: c.textSecondary }}>Total a registrar como deuda:</Text>
-                      <Text style={{ fontSize: 20, fontWeight: '800', color: c.text, marginTop: 2 }}>{formatCurrency(grandTotal, sign)}</Text>
-                    </View>
-                  ) : (
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8 }}>
-                      <TextInput
-                        style={[s.payInput, { flex: 1 }]}
-                        keyboardType="numeric"
-                        placeholder={`Monto (${sign})`}
-                        placeholderTextColor={c.textMuted}
-                        value={fmtNum(row.amount)}
-                        onChangeText={(v) => updateRow(idx, 'amount', v)}
-                      />
-                      {payments.length > 1 && (
-                        <TouchableOpacity onPress={() => removeRow(idx)} style={s.removePayBtn}>
-                          <Ionicons name="trash-outline" size={18} color={c.danger} />
-                        </TouchableOpacity>
-                      )}
-                    </View>
-                  )}
                 </View>
-              ))}
-
-              {!isCredit && (
-                <TouchableOpacity style={[s.addPayBtn, { borderColor: PRIMARY }]} onPress={addRow}>
-                  <Ionicons name="add-circle-outline" size={16} color={PRIMARY} />
-                  <Text style={[s.addPayBtnText, { color: PRIMARY }]}>Agregar método</Text>
-                </TouchableOpacity>
-              )}
-            </View>
-
-            {/* Botones de monto rápido (ocultos para crédito) */}
-            {!isCredit && (
-              <View style={{ gap: 6 }}>
-                <Text style={s.payLabel}>Monto rápido</Text>
-                <View style={s.quickRow}>
-                  {QUICK_AMOUNTS.map((amt) => (
-                    <TouchableOpacity
-                      key={amt}
-                      style={[s.quickBtn, { borderColor: PRIMARY }]}
-                      onPress={() => updateRow(0, 'amount', String(amt))}
-                    >
-                      <Text style={[s.quickBtnText, { color: PRIMARY }]}>+{amt >= 1000 ? `${amt / 1000}k` : amt}</Text>
-                    </TouchableOpacity>
-                  ))}
-                  <TouchableOpacity
-                    style={[s.quickBtn, { borderColor: PRIMARY, backgroundColor: PRIMARY + '18' }]}
-                    onPress={() => updateRow(0, 'amount', String(Math.round(grandTotal)))}
-                  >
-                    <Text style={[s.quickBtnText, { color: PRIMARY }]}>Exacto</Text>
-                  </TouchableOpacity>
-                </View>
+                {!isCredit && (
+                  <View style={s.amountRow}>
+                    <TextInput
+                      style={[s.amountInput, { borderColor: c.border, backgroundColor: c.surfaceAlt, color: c.text }]}
+                      value={fmtNum(p.amount)}
+                      onChangeText={(v) => updateRow(idx, 'amount', v.replace(/\D/g, ''))}
+                      keyboardType="numeric"
+                      placeholder="Monto"
+                      placeholderTextColor={c.textMuted}
+                    />
+                    {payments.length > 1 && (
+                      <TouchableOpacity onPress={() => removeRow(idx)} style={s.removeRowBtn}>
+                        <Ionicons name="close-circle" size={22} color={c.danger} />
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                )}
+                {!isCredit && (
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
+                    {QUICK_AMOUNTS.map((amt) => (
+                      <TouchableOpacity
+                        key={amt}
+                        style={[s.quickBtn, { borderColor: PRIMARY }]}
+                        onPress={() => updateRow(idx, 'amount', String(amt))}
+                      >
+                        <Text style={[s.quickBtnText, { color: PRIMARY }]}>{formatCurrency(amt, sign)}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </ScrollView>
+                )}
               </View>
-            )}
+            ))}
 
-            {/* Resumen de cobro */}
-            {totalPaid > 0 && (
-              <View style={[s.changeBox, remaining <= 0.01 ? s.changePos : s.changeNeg]}>
-                <Text style={s.changeLabel}>
-                  {remaining <= 0.01 ? (remaining < -0.01 ? 'Cambio a devolver' : 'Exacto') : 'Falta por cubrir'}
-                </Text>
-                <Text style={s.changeValue}>
-                  {remaining < -0.01 ? formatCurrency(Math.abs(remaining), sign) : remaining > 0.01 ? formatCurrency(remaining, sign) : '—'}
-                </Text>
-              </View>
-            )}
-
-            {/* Nombre + Observaciones — solo para crédito/fiado */}
             {isCredit && (
               <>
-                <View style={{ gap: 8 }}>
-                  <Text style={s.payLabel}>Nombre del cliente *</Text>
-                  <TextInput
-                    style={s.payInput}
-                    placeholder="Nombre completo de quien debe"
-                    placeholderTextColor={c.textMuted}
-                    value={customerName}
-                    onChangeText={setCustomerName}
-                    autoCapitalize="words"
-                  />
-                </View>
-                <View style={{ gap: 8 }}>
-                  <Text style={s.payLabel}>Observaciones *</Text>
-                  <TextInput
-                    style={[s.payInput, { minHeight: 70, textAlignVertical: 'top' }]}
-                    placeholder="Motivo, plazo de pago, referencia..."
-                    placeholderTextColor={c.textMuted}
-                    value={paymentNotes}
-                    onChangeText={setPaymentNotes}
-                    multiline
-                  />
-                </View>
+                <TextInput
+                  style={[s.amountInput, { borderColor: c.border, backgroundColor: c.surfaceAlt, color: c.text }]}
+                  value={customerName}
+                  onChangeText={setCustomerName}
+                  placeholder="Nombre del cliente"
+                  placeholderTextColor={c.textMuted}
+                />
+                <TextInput
+                  style={[s.amountInput, { borderColor: c.border, backgroundColor: c.surfaceAlt, color: c.text }]}
+                  value={paymentNotes}
+                  onChangeText={setPaymentNotes}
+                  placeholder="Observaciones del fiado"
+                  placeholderTextColor={c.textMuted}
+                />
               </>
             )}
 
+            {!isCredit && (
+              <TouchableOpacity onPress={addRow} style={[s.addRowBtn, { borderColor: PRIMARY }]}>
+                <Ionicons name="add" size={16} color={PRIMARY} />
+                <Text style={[s.addRowBtnText, { color: PRIMARY }]}>Dividir pago</Text>
+              </TouchableOpacity>
+            )}
+          </ScrollView>
+
+          <View style={s.detailFooter}>
             <TouchableOpacity
-              style={[
-                s.confirmBtn,
-                { backgroundColor: isCredit ? '#d97706' : PRIMARY },
-                (loading || (isCredit && (!customerName.trim() || !paymentNotes.trim()))) && s.btnDisabled,
-              ]}
+              style={[s.advBtn, { backgroundColor: '#059669' }, loading && s.btnDisabled]}
               onPress={confirm}
-              disabled={loading || (isCredit && (!customerName.trim() || !paymentNotes.trim()))}
+              disabled={loading}
             >
               {loading
-                ? <ActivityIndicator color={c.textInverse} />
-                : <Text style={s.confirmBtnText}>{isCredit ? 'Registrar fiado' : 'Confirmar cobro'}</Text>}
+                ? <ActivityIndicator color="#fff" />
+                : <>
+                    <Ionicons name="checkmark-circle-outline" size={18} color="#fff" />
+                    <Text style={s.advBtnText}>{isCredit ? 'Guardar fiado' : `Cobrar ${formatCurrency(orderTotal, sign)}`}</Text>
+                  </>
+              }
             </TouchableOpacity>
-          </ScrollView>
+          </View>
         </KeyboardAvoidingView>
       </SafeAreaView>
     </Modal>
@@ -359,136 +278,120 @@ function PayModal({ order, onClose, onRefresh }: {
 
 function makePayStyles(c: ReturnType<typeof useAppColors>) {
   return StyleSheet.create({
-    detailRoot: { flex: 1, backgroundColor: c.surface },
-    detailHeader: {
-      flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-      paddingHorizontal: 20, paddingVertical: 16,
-      borderBottomWidth: 1, borderBottomColor: c.border,
-    },
+    detailRoot:   { flex: 1, backgroundColor: c.surface },
+    detailHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: c.border },
     detailTitle:  { fontSize: 18, fontWeight: '700', color: c.text },
-    btnDisabled:  { opacity: 0.5 },
+    detailFooter: { padding: 16, borderTopWidth: 1, borderTopColor: c.border },
+    advBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: 12, padding: 14 },
+    advBtnText: { color: '#fff', fontWeight: '700', fontSize: 15 },
+    btnDisabled: { opacity: 0.5 },
 
-    payTotal: {
-      borderWidth: 2, borderRadius: 12, padding: 16,
-      flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    },
+    payTotal:   { borderWidth: 1, borderRadius: 12, padding: 14 },
     payTotalLabel: { fontSize: 14, fontWeight: '600', color: c.textSecondary },
-    payTotalValue: { fontSize: 24, fontWeight: '800' },
-    payLabel:      { fontSize: 13, fontWeight: '600', color: c.textSecondary },
-    payInput: {
-      borderWidth: 1, borderColor: c.border, borderRadius: 10,
-      padding: 12, fontSize: 16, backgroundColor: c.surfaceAlt, color: c.text,
-    },
-    payRow: {
-      backgroundColor: c.surfaceAlt, borderRadius: 10, padding: 12,
-      borderWidth: 1, borderColor: c.border,
-    },
-    removePayBtn: { padding: 6 },
-    addPayBtn: {
-      flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
-      borderWidth: 1, borderStyle: 'dashed', borderRadius: 10, paddingVertical: 10,
-    },
-    addPayBtnText: { fontSize: 13, fontWeight: '600' },
-    methodChip: {
-      paddingHorizontal: 14, paddingVertical: 8, borderRadius: 8,
-      borderWidth: 1, borderColor: c.border, backgroundColor: c.surface,
-    },
-    methodChipText:{ fontSize: 13, fontWeight: '600', color: c.textSecondary },
-    changeBox: {
-      borderRadius: 10, padding: 12,
-      flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    },
-    changePos:   { backgroundColor: c.successLight },
-    changeNeg:   { backgroundColor: c.dangerLight },
-    changeLabel: { fontSize: 13, fontWeight: '600', color: c.textSecondary },
-    changeValue: { fontSize: 18, fontWeight: '800', color: c.text },
-    quickRow:    { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-    quickBtn:    { borderWidth: 1.5, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8 },
-    quickBtnText:{ fontSize: 13, fontWeight: '700' },
-    confirmBtn:  { borderRadius: 12, padding: 16, alignItems: 'center', marginTop: 8 },
-    confirmBtnText: { color: '#fff', fontWeight: '700', fontSize: 15 },
+
+    payRow:        { gap: 10 },
+    methodSelect:  { borderRadius: 10, borderWidth: 1, overflow: 'hidden' },
+    methodChip:    { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 8, backgroundColor: 'transparent' },
+    methodChipText:{ fontSize: 13, fontWeight: '600' },
+    amountRow:     { flexDirection: 'row', alignItems: 'center', gap: 8 },
+    amountInput:   { flex: 1, borderWidth: 1, borderRadius: 10, padding: 12, fontSize: 18, fontWeight: '700' },
+    removeRowBtn:  { padding: 4 },
+    quickBtn:      { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 8, borderWidth: 1 },
+    quickBtnText:  { fontSize: 12, fontWeight: '600' },
+    addRowBtn:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, borderWidth: 1, borderRadius: 10, padding: 10, borderStyle: 'dashed' },
+    addRowBtnText: { fontSize: 14, fontWeight: '600' },
   })
 }
 
-// (AddItemsModal replaced by ProductPickerModal — see src/components/ProductPickerModal.tsx)
+// ─── OrderCard (acordeón) ─────────────────────────────────────────────────────
 
-// ─── Modal detalle ────────────────────────────────────────────────────────────
-
-function DetailModal({ order: orderProp, onClose, onRefresh, onRefreshDetail, readOnly = false }: {
-  order: Order | null
-  onClose: () => void
+function OrderCard({ listOrder, expanded, onToggle, onRefresh, readOnly }: {
+  listOrder: Order
+  expanded: boolean
+  onToggle: () => void
   onRefresh: () => void
-  onRefreshDetail?: () => Promise<void>
-  readOnly?: boolean
+  readOnly: boolean
 }) {
   const c = useAppColors()
-  const s = makeDetailStyles(c)
-  const { tenant } = useAuthStore()
+  const s = makeCardStyles(c)
+  const { tenant, user } = useAuthStore()
   const qc = useQueryClient()
+  const { isConnected } = useNetworkStatus()
   const PRIMARY = tenant?.primaryColor ?? '#2563eb'
   const sign    = tenant?.currencySign ?? '$'
+  const isAdmin = user?.role === 'admin'
 
-  const { isConnected } = useNetworkStatus()
-  const [order, setOrder] = useState(orderProp)
-  const [loading, setLoading]       = useState(false)
+  const [order, setOrder]           = useState<Order>(listOrder)
+  const [loadingFull, setLoadingFull] = useState(false)
+  const [actionLoading, setActionLoading] = useState(false)
   const [payOpen, setPayOpen]       = useState(false)
   const [addOpen, setAddOpen]       = useState(false)
   const [cancellingItem, setCancellingItem] = useState<string | null>(null)
 
-  // Sync internal state when selected order changes (different ID or refreshed data)
-  useEffect(() => { setOrder(orderProp) }, [orderProp])
+  // Sync from list when not expanded (list data updates via refetch)
+  useEffect(() => { if (!expanded) setOrder(listOrder) }, [listOrder, expanded])
 
-  if (!order) return null
+  // Fetch full order (with items) when expanded
+  useEffect(() => {
+    if (!expanded) return
+    setLoadingFull(true)
+    api.get<{ data: Order }>(`/api/tenant/orders/${listOrder.id}`)
+      .then((res) => { if (res.data) setOrder(res.data) })
+      .catch(() => {})
+      .finally(() => setLoadingFull(false))
+  }, [expanded, listOrder.id])
+
+  async function refreshOrder() {
+    try {
+      const res = await api.get<{ data: Order }>(`/api/tenant/orders/${listOrder.id}`)
+      if (res.data) setOrder(res.data)
+    } catch {}
+    onRefresh()
+  }
 
   const color = ORDER_STATUS_COLORS[order.status] ?? '#6b7280'
   const label = ORDER_STATUS_LABELS[order.status] ?? order.status
-  const canCancel     = !readOnly && !['closed', 'cancelled'].includes(order.status)
-  const canPay        = !readOnly && order.status === 'ready'
-  const canAdvance    = !readOnly && ['new', 'sent', 'preparing'].includes(order.status)
+  const origin = order.tableName
+    ? `Mesa ${order.tableName}`
+    : ORDER_TYPE_LABELS[order.type] ?? order.type
+
+  const canCancel    = !readOnly && !['closed', 'cancelled'].includes(order.status)
+  const canPay       = !readOnly && order.status === 'ready'
+  const canAdvance   = !readOnly && ['new', 'sent', 'preparing'].includes(order.status)
   const canCancelItem = !readOnly && !['closed', 'cancelled'].includes(order.status)
-  const canAddItems   = !readOnly && !['closed', 'cancelled'].includes(order.status)
+  const canAddItems  = !readOnly && !['closed', 'cancelled'].includes(order.status)
 
   const ADVANCE_LABELS: Partial<Record<string, string>> = {
-    new: 'Enviar a cocina',
-    sent: 'Marcar preparando',
-    preparing: 'Marcar listo',
+    new: 'Enviar a cocina', sent: 'Marcar preparando', preparing: 'Marcar listo',
   }
-
   const NEXT_STATUS: Record<string, string> = {
     new: 'sent', sent: 'preparing', preparing: 'ready',
   }
 
   function applyOptimisticStatus(status: string) {
-    const next = status as OrderStatus
-    setOrder((prev) => prev ? { ...prev, status: next } : prev)
+    setOrder((prev) => ({ ...prev, status: status as OrderStatus }))
     qc.setQueryData<Order[]>(['orders', 'active'], (old = []) =>
-      old.map((o) => o.id === order!.id ? { ...o, status: next } : o)
+      old.map((o) => o.id === order.id ? { ...o, status: status as OrderStatus } : o)
     )
-  }
-
-  function rollbackStatus() {
-    setOrder(orderProp)
-    qc.invalidateQueries({ queryKey: ['orders'] })
   }
 
   async function advance(status: string) {
     applyOptimisticStatus(status)
-    setLoading(true)
+    setActionLoading(true)
     try {
-      await api.patch(`/api/tenant/orders/${order!.id}`, { status })
+      await api.patch(`/api/tenant/orders/${order.id}`, { status })
       onRefresh()
     } catch (err: any) {
-      rollbackStatus()
+      setOrder(listOrder)
       const isNetErr = !isConnected || err?.message?.includes('Network request failed')
       if (isNetErr) {
-        applyOptimisticStatus(status) // re-apply: user sees queued state
-        enqueueSync('update_order_status', { orderId: order!.id, status })
+        applyOptimisticStatus(status)
+        enqueueSync('update_order_status', { orderId: order.id, status })
         Alert.alert('Sin conexión', 'El cambio se sincronizará cuando vuelva la conexión.')
-        onClose()
       } else {
         Alert.alert('Error', err.message)
       }
-    } finally { setLoading(false) }
+    } finally { setActionLoading(false) }
   }
 
   async function cancel() {
@@ -497,206 +400,223 @@ function DetailModal({ order: orderProp, onClose, onRefresh, onRefreshDetail, re
       {
         text: 'Cancelar', style: 'destructive', onPress: async () => {
           applyOptimisticStatus('cancelled')
-          setLoading(true)
+          setActionLoading(true)
           try {
-            await api.patch(`/api/tenant/orders/${order!.id}`, { status: 'cancelled' })
-            onRefresh(); onClose()
+            await api.patch(`/api/tenant/orders/${order.id}`, { status: 'cancelled' })
+            onToggle(); onRefresh()
           } catch (err: any) {
-            rollbackStatus()
+            setOrder(listOrder)
             const isNetErr = !isConnected || err?.message?.includes('Network request failed')
             if (isNetErr) {
               applyOptimisticStatus('cancelled')
-              enqueueSync('update_order_status', { orderId: order!.id, status: 'cancelled' })
+              enqueueSync('update_order_status', { orderId: order.id, status: 'cancelled' })
               Alert.alert('Sin conexión', 'La cancelación se sincronizará cuando vuelva la conexión.')
-              onClose()
+              onToggle()
             } else {
               Alert.alert('Error', err.message)
             }
-          } finally { setLoading(false) }
+          } finally { setActionLoading(false) }
+        },
+      },
+    ])
+  }
+
+  async function deleteOrder() {
+    Alert.alert('Eliminar pedido', '¿Eliminar permanentemente este pedido? Esta acción no se puede deshacer.', [
+      { text: 'No', style: 'cancel' },
+      {
+        text: 'Eliminar', style: 'destructive', onPress: async () => {
+          setActionLoading(true)
+          try {
+            await api.delete(`/api/tenant/orders/${order.id}`)
+            qc.setQueryData<Order[]>(['orders', 'active'], (old = []) => old.filter((o) => o.id !== order.id))
+            qc.setQueryData<Order[]>(['orders', 'historial'], (old = []) => old?.filter((o) => o.id !== order.id))
+            onRefresh()
+          } catch (err: any) {
+            Alert.alert('Error', err.message ?? 'No se pudo eliminar el pedido')
+          } finally { setActionLoading(false) }
         },
       },
     ])
   }
 
   async function cancelItem(itemId: string, itemName: string) {
-    Alert.alert(
-      'Quitar producto',
-      `¿Cancelar "${itemName}" de este pedido?`,
-      [
-        { text: 'No', style: 'cancel' },
-        {
-          text: 'Quitar', style: 'destructive', onPress: async () => {
-            // Optimistic: mark item cancelled immediately
-            setOrder((prev) => prev ? {
-              ...prev,
-              items: prev.items?.map((it) =>
-                it.id === itemId ? { ...it, status: 'cancelled' as any } : it
-              ),
-            } : prev)
-            setCancellingItem(itemId)
-            try {
-              await api.delete(`/api/tenant/orders/${order!.id}/items/${itemId}`)
-              if (onRefreshDetail) await onRefreshDetail()
-              onRefresh()
-            } catch (err: any) {
-              // Rollback item cancel
-              setOrder(orderProp)
-              const isNetErr = !isConnected || err?.message?.includes('Network request failed')
-              if (isNetErr) {
-                enqueueSync('cancel_item', { orderId: order!.id, itemId })
-                Alert.alert('Sin conexión', 'La cancelación se sincronizará cuando vuelva la conexión.')
-                onClose()
-              } else {
-                Alert.alert('Error', err.message ?? 'No se pudo cancelar el producto')
-              }
-            } finally {
-              setCancellingItem(null)
+    Alert.alert('Quitar producto', `¿Cancelar "${itemName}" de este pedido?`, [
+      { text: 'No', style: 'cancel' },
+      {
+        text: 'Quitar', style: 'destructive', onPress: async () => {
+          setOrder((prev) => ({
+            ...prev,
+            items: prev.items?.map((it) => it.id === itemId ? { ...it, status: 'cancelled' as any } : it),
+          }))
+          setCancellingItem(itemId)
+          try {
+            await api.delete(`/api/tenant/orders/${order.id}/items/${itemId}`)
+            await refreshOrder()
+          } catch (err: any) {
+            setOrder(listOrder)
+            const isNetErr = !isConnected || err?.message?.includes('Network request failed')
+            if (isNetErr) {
+              enqueueSync('cancel_item', { orderId: order.id, itemId })
+              Alert.alert('Sin conexión', 'La cancelación se sincronizará cuando vuelva la conexión.')
+            } else {
+              Alert.alert('Error', err.message ?? 'No se pudo cancelar el producto')
             }
-          },
+          } finally { setCancellingItem(null) }
         },
-      ]
-    )
+      },
+    ])
   }
 
   return (
-    <>
-      <Modal visible animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
-        <SafeAreaView style={s.detailRoot}>
-          <View style={s.detailHeader}>
-            <Text style={s.detailTitle}>
-              {order.displayCode ?? `Pedido #${order.id.slice(-6).toUpperCase()}`}
-            </Text>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-              {canAddItems && (
-                <TouchableOpacity onPress={() => setAddOpen(true)} style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                  <Ionicons name="add-circle-outline" size={22} color={PRIMARY} />
-                  <Text style={{ color: PRIMARY, fontWeight: '600', fontSize: 14 }}>Agregar</Text>
-                </TouchableOpacity>
-              )}
-              <TouchableOpacity onPress={onClose}>
-                <Ionicons name="close" size={24} color={c.textSecondary} />
-              </TouchableOpacity>
-            </View>
+    <View style={[s.cardWrap, expanded && { borderColor: PRIMARY + '40', borderWidth: 1 }]}>
+      {/* ── Fila cabecera (siempre visible, tap = expand/collapse) ── */}
+      <TouchableOpacity style={s.row} onPress={onToggle} activeOpacity={0.75}>
+        <View style={{ flex: 1 }}>
+          <Text style={s.rowOrigin}>{origin}</Text>
+          <Text style={s.rowMeta} numberOfLines={1}>
+            {order.displayCode ?? `#${order.id.slice(-6).toUpperCase()}`}
+            {order.customerName ? `  ·  ${order.customerName}` : ''}
+            {order.createdAt ? `  ·  ${formatDateTime(order.createdAt)}` : ''}
+          </Text>
+          <Text style={s.rowItems}>{(order as any).itemsCount ?? order.items?.length ?? 0} producto(s)</Text>
+        </View>
+        <View style={{ alignItems: 'flex-end', gap: 6, marginRight: 8 }}>
+          <Text style={s.rowTotal}>{formatCurrency(parseFloat(order.total), sign)}</Text>
+          <View style={[s.badge, { backgroundColor: color + '22' }]}>
+            <Text style={[s.badgeText, { color }]}>{label}</Text>
           </View>
+        </View>
+        <Ionicons name={expanded ? 'chevron-up' : 'chevron-down'} size={18} color={c.textMuted} style={{ alignSelf: 'center' }} />
+      </TouchableOpacity>
 
-          <ScrollView contentContainerStyle={{ paddingBottom: 24 }}>
-            <View style={s.detailSection}>
-              <View style={[s.badge, { backgroundColor: color + '22', alignSelf: 'flex-start', marginBottom: 10 }]}>
-                <Text style={[s.badgeText, { color }]}>{label}</Text>
-              </View>
-              <Text style={s.meta}>Tipo: {ORDER_TYPE_LABELS[order.type] ?? order.type}</Text>
-              {order.tableName        && <Text style={s.meta}>Mesa: {order.tableName}</Text>}
-              {order.customerName    && <Text style={s.meta}>Cliente: {order.customerName}</Text>}
-              {order.customerPhone   && <Text style={s.meta}>Tel: {order.customerPhone}</Text>}
-              {order.customerAddress && <Text style={s.meta}>Dirección: {order.customerAddress}</Text>}
-              {order.customerNotes   && <Text style={s.meta}>Nota cliente: {order.customerNotes}</Text>}
-              {order.createdAt       && <Text style={s.meta}>Hora: {formatDateTime(order.createdAt)}</Text>}
-              {order.notes           && <Text style={s.meta}>Nota: {order.notes}</Text>}
-            </View>
+      {/* ── Detalle inline (solo cuando expanded) ── */}
+      {expanded && (
+        <View style={s.detail}>
+          {loadingFull
+            ? <View style={{ padding: 20, alignItems: 'center' }}><ActivityIndicator color={PRIMARY} /></View>
+            : (
+              <>
+                {/* Info */}
+                <View style={s.infoSection}>
+                  {order.tableName       && <Text style={s.meta}>Mesa: {order.tableName}</Text>}
+                  {order.customerName   && <Text style={s.meta}>Cliente: {order.customerName}</Text>}
+                  {order.customerPhone  && <Text style={s.meta}>Tel: {order.customerPhone}</Text>}
+                  {order.customerAddress && <Text style={s.meta}>Dirección: {order.customerAddress}</Text>}
+                  {order.customerNotes  && <Text style={s.meta}>Nota cliente: {order.customerNotes}</Text>}
+                  {order.notes          && <Text style={s.meta}>Nota: {order.notes}</Text>}
+                </View>
 
-            {order.items && order.items.length > 0 && (
-              <View style={s.detailSection}>
-                <Text style={s.detailSectionTitle}>Productos</Text>
-                {order.items.map((item) => {
-                  const name = (item.productSnapshot as any)?.name ?? 'Producto'
-                  const isCancelled  = item.status === 'cancelled'
-                  const isCancelling = cancellingItem === item.id
-                  return (
-                    <View key={item.id} style={[s.detailItem, isCancelled && s.detailItemCancelled]}>
-                      <Text style={[s.detailQty, { color: isCancelled ? c.textMuted : PRIMARY }]}>
-                        {item.quantity}×
-                      </Text>
-                      <View style={{ flex: 1 }}>
-                        <Text style={[s.detailName, isCancelled && { color: c.textMuted, textDecorationLine: 'line-through' }]}>
-                          {name}
-                        </Text>
-                        {Array.isArray(item.modifierSnapshot) && item.modifierSnapshot.length > 0 && (
-                          <Text style={s.detailMods}>
-                            {(item.modifierSnapshot as any[]).map((m) => m.modifierName).join(' · ')}
-                          </Text>
-                        )}
-                        {item.notes ? <Text style={[s.detailMods, { color: '#f97316' }]}>⚠ {item.notes}</Text> : null}
-                        {isCancelled && <Text style={s.cancelledTag}>Cancelado</Text>}
-                      </View>
-                      <View style={{ alignItems: 'flex-end', gap: 4 }}>
-                        <Text style={[s.detailItemTotal, isCancelled && { color: c.textMuted, textDecorationLine: 'line-through' }]}>
-                          {formatCurrency(parseFloat(item.itemTotal), sign)}
-                        </Text>
-                        {canCancelItem && !isCancelled && (
-                          isCancelling
-                            ? <ActivityIndicator size="small" color={c.danger} />
-                            : (
-                              <TouchableOpacity
-                                style={s.itemCancelBtn}
-                                onPress={() => cancelItem(item.id, name)}
-                              >
-                                <Ionicons name="close-circle-outline" size={18} color={c.danger} />
-                              </TouchableOpacity>
-                            )
-                        )}
-                      </View>
+                {/* Productos */}
+                {order.items && order.items.length > 0 && (
+                  <View style={s.itemsSection}>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                      <Text style={s.sectionTitle}>Productos</Text>
+                      {canAddItems && (
+                        <TouchableOpacity onPress={() => setAddOpen(true)} style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                          <Ionicons name="add-circle-outline" size={16} color={PRIMARY} />
+                          <Text style={{ color: PRIMARY, fontWeight: '600', fontSize: 13 }}>Agregar</Text>
+                        </TouchableOpacity>
+                      )}
                     </View>
-                  )
-                })}
-              </View>
-            )}
+                    {order.items.map((item) => {
+                      const name = (item.productSnapshot as any)?.name ?? 'Producto'
+                      const isCancelled  = item.status === 'cancelled'
+                      const isCancelling = cancellingItem === item.id
+                      return (
+                        <View key={item.id} style={[s.itemRow, isCancelled && { opacity: 0.5 }]}>
+                          <Text style={[s.itemQty, { color: isCancelled ? c.textMuted : PRIMARY }]}>{item.quantity}×</Text>
+                          <View style={{ flex: 1 }}>
+                            <Text style={[s.itemName, isCancelled && { textDecorationLine: 'line-through', color: c.textMuted }]}>{name}</Text>
+                            {Array.isArray(item.modifierSnapshot) && item.modifierSnapshot.length > 0 && (
+                              <Text style={s.itemMods}>{(item.modifierSnapshot as any[]).map((m) => m.modifierName).join(' · ')}</Text>
+                            )}
+                            {item.notes ? <Text style={[s.itemMods, { color: '#f97316' }]}>⚠ {item.notes}</Text> : null}
+                            {isCancelled && <Text style={{ fontSize: 11, color: c.danger, fontWeight: '600' }}>Cancelado</Text>}
+                          </View>
+                          <View style={{ alignItems: 'flex-end', gap: 4 }}>
+                            <Text style={[s.itemTotal, isCancelled && { textDecorationLine: 'line-through', color: c.textMuted }]}>
+                              {formatCurrency(parseFloat(item.itemTotal), sign)}
+                            </Text>
+                            {canCancelItem && !isCancelled && (
+                              isCancelling
+                                ? <ActivityIndicator size="small" color={c.danger} />
+                                : (
+                                  <TouchableOpacity onPress={() => cancelItem(item.id, name)} style={{ padding: 2 }}>
+                                    <Ionicons name="close-circle-outline" size={18} color={c.danger} />
+                                  </TouchableOpacity>
+                                )
+                            )}
+                          </View>
+                        </View>
+                      )
+                    })}
+                  </View>
+                )}
 
-            <View style={[s.detailSection, { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }]}>
-              <Text style={{ fontSize: 15, fontWeight: '600', color: c.textSecondary }}>Total</Text>
-              <Text style={{ fontSize: 22, fontWeight: '800', color: c.text }}>
-                {formatCurrency(parseFloat(order.total), sign)}
-              </Text>
-            </View>
-          </ScrollView>
+                {/* Total */}
+                <View style={s.totalRow}>
+                  <Text style={s.totalLabel}>Total</Text>
+                  <Text style={[s.totalValue, { color: c.text }]}>{formatCurrency(parseFloat(order.total), sign)}</Text>
+                </View>
 
-          {!readOnly && (
-            <View style={s.detailFooter}>
-              {canAdvance && (
-                <TouchableOpacity
-                  style={[s.advBtn, { backgroundColor: PRIMARY }, loading && s.btnDisabled]}
-                  onPress={() => advance(NEXT_STATUS[order.status])}
-                  disabled={loading}
-                >
-                  {loading
-                    ? <ActivityIndicator color={c.textInverse} />
-                    : <Text style={s.advBtnText}>{ADVANCE_LABELS[order.status] ?? 'Avanzar'}</Text>}
-                </TouchableOpacity>
-              )}
+                {/* Acciones */}
+                <View style={s.actions}>
+                  {canAdvance && (
+                    <TouchableOpacity
+                      style={[s.actionBtn, { backgroundColor: PRIMARY }, actionLoading && s.btnDisabled]}
+                      onPress={() => advance(NEXT_STATUS[order.status])}
+                      disabled={actionLoading}
+                    >
+                      {actionLoading
+                        ? <ActivityIndicator color="#fff" size="small" />
+                        : <Text style={s.actionBtnText}>{ADVANCE_LABELS[order.status] ?? 'Avanzar'}</Text>}
+                    </TouchableOpacity>
+                  )}
+                  {canPay && (
+                    <TouchableOpacity
+                      style={[s.actionBtn, { backgroundColor: '#059669' }, actionLoading && s.btnDisabled]}
+                      onPress={() => setPayOpen(true)}
+                      disabled={actionLoading}
+                    >
+                      <Ionicons name="cash-outline" size={16} color="#fff" />
+                      <Text style={s.actionBtnText}>Cobrar</Text>
+                    </TouchableOpacity>
+                  )}
+                  {canCancel && (
+                    <TouchableOpacity
+                      style={[s.cancelActionBtn, actionLoading && s.btnDisabled]}
+                      onPress={cancel}
+                      disabled={actionLoading}
+                    >
+                      <Text style={[s.actionBtnText, { color: c.danger }]}>Cancelar pedido</Text>
+                    </TouchableOpacity>
+                  )}
+                  {isAdmin && (
+                    <TouchableOpacity
+                      style={[s.deleteActionBtn, actionLoading && s.btnDisabled]}
+                      onPress={deleteOrder}
+                      disabled={actionLoading}
+                    >
+                      <Ionicons name="trash-outline" size={14} color="#9ca3af" />
+                      <Text style={s.deleteActionBtnText}>Eliminar pedido</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              </>
+            )
+          }
+        </View>
+      )}
 
-
-              {canPay && (
-                <TouchableOpacity
-                  style={[s.advBtn, { backgroundColor: '#059669' }, loading && s.btnDisabled]}
-                  onPress={() => setPayOpen(true)}
-                  disabled={loading}
-                >
-                  <Ionicons name="cash-outline" size={18} color={c.textInverse} />
-                  <Text style={s.advBtnText}>Cobrar</Text>
-                </TouchableOpacity>
-              )}
-
-              {canCancel && (
-                <TouchableOpacity
-                  style={[s.cancelBtn, loading && s.btnDisabled]}
-                  onPress={cancel}
-                  disabled={loading}
-                >
-                  <Text style={s.cancelBtnText}>Cancelar pedido</Text>
-                </TouchableOpacity>
-              )}
-            </View>
-          )}
-        </SafeAreaView>
-      </Modal>
-
+      {/* Modals */}
       {payOpen && (
         <PayModal
           order={order}
           onClose={() => setPayOpen(false)}
-          onRefresh={() => { onRefresh(); onClose() }}
+          onRefresh={() => { refreshOrder(); onToggle() }}
         />
       )}
-
       {addOpen && (
         <ProductPickerModal
           visible={addOpen}
@@ -717,63 +637,70 @@ function DetailModal({ order: orderProp, onClose, onRefresh, onRefreshDetail, re
               })),
             }))
             try {
-              await api.patch(`/api/tenant/orders/${order!.id}`, { action: 'add_items', items: apiItems })
+              await api.patch(`/api/tenant/orders/${order.id}`, { action: 'add_items', items: apiItems })
             } catch (err: any) {
               const isNetErr = !isConnected || err?.status === 0 || err?.message?.includes('Network request failed')
               if (isNetErr) {
-                enqueueSync('add_order_items', { orderId: order!.id, items: apiItems })
+                enqueueSync('add_order_items', { orderId: order.id, items: apiItems })
                 Alert.alert('Sin conexión', 'Los productos se agregarán al reconectar.')
               } else {
                 Alert.alert('Error', err.message ?? 'No se pudo agregar el producto')
                 throw err
               }
             }
-            // Refresh detail directly so the total and items update immediately
             try {
-              const res = await api.get<{ data: Order }>(`/api/tenant/orders/${order!.id}`)
-              setOrder(res.data)
-              if (onRefreshDetail) onRefreshDetail()
-            } catch { /* if fetch fails, parent refresh below covers it */ }
+              const res = await api.get<{ data: Order }>(`/api/tenant/orders/${order.id}`)
+              if (res.data) setOrder(res.data)
+            } catch {}
             setAddOpen(false)
             onRefresh()
           }}
         />
       )}
-    </>
+    </View>
   )
 }
 
-function makeDetailStyles(c: ReturnType<typeof useAppColors>) {
+function makeCardStyles(c: ReturnType<typeof useAppColors>) {
   return StyleSheet.create({
-    detailRoot: { flex: 1, backgroundColor: c.surface },
-    detailHeader: {
-      flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-      paddingHorizontal: 20, paddingVertical: 16,
-      borderBottomWidth: 1, borderBottomColor: c.border,
+    cardWrap: {
+      backgroundColor: c.surface, marginHorizontal: 12, marginTop: 10,
+      borderRadius: 12, overflow: 'hidden',
+      shadowColor: c.shadow, shadowOpacity: 0.04, shadowRadius: 6, elevation: 2,
+      borderWidth: 1, borderColor: 'transparent',
     },
-    detailTitle:  { fontSize: 18, fontWeight: '700', color: c.text },
-    detailSection:{ padding: 20, borderBottomWidth: 1, borderBottomColor: c.background },
-    detailSectionTitle: { fontSize: 11, fontWeight: '700', color: c.textMuted, textTransform: 'uppercase', marginBottom: 10, letterSpacing: 0.5 },
-    meta:         { fontSize: 14, color: c.textSecondary, marginBottom: 3 },
-    badge:        { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 },
-    badgeText:    { fontSize: 11, fontWeight: '600' },
-    detailItem:   { flexDirection: 'row', alignItems: 'flex-start', paddingVertical: 6, gap: 8 },
-    detailQty:    { fontSize: 14, fontWeight: '700', minWidth: 26 },
-    detailName:   { fontSize: 14, fontWeight: '600', color: c.text },
-    detailMods:   { fontSize: 12, color: c.textMuted, marginTop: 2 },
-    detailItemTotal:    { fontSize: 13, fontWeight: '600', color: c.textSecondary },
-    detailItemCancelled:{ opacity: 0.6 },
-    cancelledTag: { fontSize: 11, color: c.danger, fontWeight: '600', marginTop: 2 },
-    itemCancelBtn:{ padding: 2 },
-    detailFooter: { padding: 20, gap: 10, borderTopWidth: 1, borderTopColor: c.border },
-    advBtn: {
-      flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
-      borderRadius: 12, padding: 14,
-    },
-    advBtnText:   { color: '#fff', fontWeight: '700', fontSize: 15 },
-    cancelBtn:    { borderWidth: 1, borderColor: c.danger, borderRadius: 12, padding: 14, alignItems: 'center', backgroundColor: c.dangerLight },
-    cancelBtnText:{ color: c.danger, fontWeight: '600', fontSize: 14 },
-    btnDisabled:  { opacity: 0.5 },
+    row: { flexDirection: 'row', padding: 14, alignItems: 'flex-start' },
+    rowOrigin: { fontSize: 16, fontWeight: '700', color: c.text },
+    rowMeta:   { fontSize: 12, color: c.textMuted, marginTop: 2 },
+    rowItems:  { fontSize: 12, color: c.textMuted, marginTop: 4 },
+    rowTotal:  { fontSize: 15, fontWeight: '700', color: c.text },
+    badge:     { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 },
+    badgeText: { fontSize: 11, fontWeight: '600' },
+
+    detail: { borderTopWidth: 1, borderTopColor: c.border },
+
+    infoSection: { padding: 14, paddingBottom: 10, borderBottomWidth: 1, borderBottomColor: c.border },
+    meta: { fontSize: 13, color: c.textSecondary, marginBottom: 3 },
+
+    itemsSection: { padding: 14, borderBottomWidth: 1, borderBottomColor: c.border },
+    sectionTitle: { fontSize: 11, fontWeight: '700', color: c.textMuted, textTransform: 'uppercase', letterSpacing: 0.5 },
+    itemRow:   { flexDirection: 'row', alignItems: 'flex-start', paddingVertical: 5, gap: 8 },
+    itemQty:   { fontSize: 14, fontWeight: '700', minWidth: 26 },
+    itemName:  { fontSize: 14, fontWeight: '600', color: c.text },
+    itemMods:  { fontSize: 12, color: c.textMuted, marginTop: 2 },
+    itemTotal: { fontSize: 13, fontWeight: '600', color: c.textSecondary },
+
+    totalRow:  { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 14, borderBottomWidth: 1, borderBottomColor: c.border },
+    totalLabel:{ fontSize: 14, fontWeight: '600', color: c.textSecondary },
+    totalValue:{ fontSize: 20, fontWeight: '800' },
+
+    actions: { padding: 14, gap: 8 },
+    actionBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, borderRadius: 10, padding: 12 },
+    actionBtnText: { color: '#fff', fontWeight: '700', fontSize: 14 },
+    cancelActionBtn: { borderWidth: 1, borderColor: c.danger, borderRadius: 10, padding: 12, alignItems: 'center', backgroundColor: c.dangerLight },
+    deleteActionBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, padding: 8 },
+    deleteActionBtnText: { fontSize: 12, color: '#9ca3af', fontWeight: '500' },
+    btnDisabled: { opacity: 0.5 },
   })
 }
 
@@ -786,10 +713,10 @@ export default function PedidosScreen() {
   const { tenant } = useAuthStore()
   const PRIMARY = tenant?.primaryColor ?? '#2563eb'
 
-  const [mode, setMode]     = useState<'active' | 'historial'>('active')
+  const [mode, setMode]         = useState<'active' | 'historial'>('active')
   const [activeTab, setActiveTab] = useState<OrderStatus | 'all'>('all')
-  const [histTab, setHistTab]     = useState<'all' | 'closed' | 'cancelled'>('all')
-  const [selected, setSelected]   = useState<Order | null>(null)
+  const [histTab, setHistTab]   = useState<'all' | 'cancelled'>('all')
+  const [expandedId, setExpandedId] = useState<string | null>(null)
 
   const activeQuery = useQuery({
     queryKey: ['orders', 'active'],
@@ -826,26 +753,12 @@ export default function PedidosScreen() {
   const isRefetching = mode === 'active' ? activeQuery.isRefetching : historialQuery.isRefetching
   const refetch      = mode === 'active' ? activeQuery.refetch : historialQuery.refetch
 
+  const completedOrders = historialOrders.filter((o) => o.status !== 'cancelled')
+  const cancelledOrders = historialOrders.filter((o) => o.status === 'cancelled')
+
   const filtered = mode === 'active'
     ? (activeTab === 'all' ? activeOrders : activeOrders.filter((o) => o.status === activeTab))
-    : (histTab === 'all' ? historialOrders.filter((o) => o.status !== 'cancelled') : historialOrders.filter((o) => o.status === histTab))
-
-  async function openDetail(order: Order) {
-    try {
-      const res = await api.get<{ data: Order }>(`/api/tenant/orders/${order.id}`)
-      setSelected(res.data)
-    } catch {
-      setSelected(order)
-    }
-  }
-
-  async function refreshDetail() {
-    if (!selected) return
-    try {
-      const res = await api.get<{ data: Order }>(`/api/tenant/orders/${selected.id}`)
-      setSelected(res.data)
-    } catch {}
-  }
+    : (histTab === 'all' ? completedOrders : cancelledOrders)
 
   const refresh = useCallback(() => {
     if (mode === 'active') {
@@ -855,6 +768,13 @@ export default function PedidosScreen() {
     }
     refetch()
   }, [qc, refetch, mode])
+
+  function toggleExpand(id: string) {
+    setExpandedId((prev) => (prev === id ? null : id))
+  }
+
+  // Collapse when switching modes/tabs
+  useEffect(() => { setExpandedId(null) }, [mode, activeTab, histTab])
 
   const tabs    = mode === 'active' ? ACTIVE_TABS : HIST_TABS
   const currTab = mode === 'active' ? activeTab : histTab
@@ -886,9 +806,9 @@ export default function PedidosScreen() {
         style={s.tabBar} contentContainerStyle={s.tabContent}
       >
         {tabs.map((t) => {
-          const count  = t.key === 'all'
-            ? (mode === 'active' ? activeOrders : historialOrders).length
-            : (mode === 'active' ? activeOrders : historialOrders).filter((o) => o.status === t.key).length
+          const count = mode === 'active'
+            ? (t.key === 'all' ? activeOrders.length : activeOrders.filter((o) => o.status === t.key).length)
+            : (t.key === 'all' ? completedOrders.length : cancelledOrders.length)
           const active = currTab === t.key
           return (
             <TouchableOpacity
@@ -912,7 +832,15 @@ export default function PedidosScreen() {
           <FlatList
             data={filtered}
             keyExtractor={(o) => o.id}
-            renderItem={({ item }) => <OrderRow order={item} onPress={() => openDetail(item)} />}
+            renderItem={({ item }) => (
+              <OrderCard
+                listOrder={item}
+                expanded={expandedId === item.id}
+                onToggle={() => toggleExpand(item.id)}
+                onRefresh={refresh}
+                readOnly={mode === 'historial'}
+              />
+            )}
             contentContainerStyle={s.list}
             refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refresh} tintColor={PRIMARY} />}
             ListEmptyComponent={
@@ -926,14 +854,6 @@ export default function PedidosScreen() {
           />
         )
       }
-
-      <DetailModal
-        order={selected}
-        onClose={() => setSelected(null)}
-        onRefresh={refresh}
-        onRefreshDetail={refreshDetail}
-        readOnly={mode === 'historial'}
-      />
     </View>
   )
 }
@@ -956,7 +876,7 @@ function makePedidosStyles(c: ReturnType<typeof useAppColors>) {
     },
     modeBtnText: { fontSize: 13, fontWeight: '600', color: c.textSecondary },
 
-    tabBar:    { backgroundColor: c.surface, borderBottomWidth: 1, borderBottomColor: c.border },
+    tabBar:    { backgroundColor: c.surface, borderBottomWidth: 1, borderBottomColor: c.border, flexShrink: 0 },
     tabContent:{ paddingHorizontal: 12, paddingVertical: 10, gap: 6, flexDirection: 'row', alignItems: 'center' },
     tab:       { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, backgroundColor: c.surfaceAlt },
     tabText:   { fontSize: 13, color: c.textMuted, fontWeight: '600' },
