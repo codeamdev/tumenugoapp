@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react'
 import {
   View, Text, FlatList, TouchableOpacity, StyleSheet,
-  TextInput, Modal, ScrollView, ActivityIndicator,
+  TextInput, Modal, ScrollView, ActivityIndicator, KeyboardAvoidingView, Platform,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useQuery } from '@tanstack/react-query'
@@ -29,245 +29,6 @@ interface Props {
   onConfirm: (items: PickedItem[]) => Promise<void>
   title?: string
   confirmLabel?: string
-}
-
-// ─── FlavorPicker ─────────────────────────────────────────────────────────────
-
-function FlavorPicker({ product, onAdd, onClose }: {
-  product: Product
-  onAdd: (flavor: string, qty: number) => void
-  onClose: () => void
-}) {
-  const c = useAppColors()
-  const { tenant } = useAuthStore()
-  const PRIMARY = tenant?.primaryColor ?? '#2563eb'
-  const sign    = tenant?.currencySign ?? '$'
-  const [sel, setSel] = useState<string | null>(null)
-  const [qty, setQty] = useState(1)
-  const price = parseFloat(product.price)
-
-  return (
-    <Modal visible animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
-      <SafeAreaView style={[s.pickRoot, { backgroundColor: c.surface }]}>
-        <View style={[s.pickHeader, { borderBottomColor: c.border }]}>
-          <TouchableOpacity onPress={onClose}><Ionicons name="close" size={24} color={c.textSecondary} /></TouchableOpacity>
-          <Text style={[s.pickTitle, { color: c.text }]} numberOfLines={1}>{product.name}</Text>
-          <View style={{ width: 24 }} />
-        </View>
-        <ScrollView contentContainerStyle={s.pickBody}>
-          <Text style={[s.groupName, { color: c.text }]}>Elige el sabor</Text>
-          <View style={s.chipsWrap}>
-            {product.flavors.map((fl) => {
-              const selected = fl === sel
-              return (
-                <TouchableOpacity
-                  key={fl}
-                  style={[s.chip, { borderColor: selected ? PRIMARY : c.border, backgroundColor: selected ? PRIMARY : c.surfaceAlt }]}
-                  onPress={() => setSel(fl)}
-                >
-                  <Text style={[s.chipText, { color: selected ? '#fff' : c.textSecondary }]}>{fl}</Text>
-                </TouchableOpacity>
-              )
-            })}
-          </View>
-          <View style={s.qtySection}>
-            <Text style={[s.groupName, { color: c.text }]}>Cantidad</Text>
-            <View style={s.qtyRow}>
-              <TouchableOpacity style={[s.qtyBtn, { borderColor: PRIMARY }]} onPress={() => setQty((q) => Math.max(1, q - 1))}>
-                <Ionicons name="remove" size={18} color={PRIMARY} />
-              </TouchableOpacity>
-              <Text style={[s.qtyNum, { color: c.text }]}>{qty}</Text>
-              <TouchableOpacity style={[s.qtyBtn, { borderColor: PRIMARY }]} onPress={() => setQty((q) => q + 1)}>
-                <Ionicons name="add" size={18} color={PRIMARY} />
-              </TouchableOpacity>
-            </View>
-          </View>
-        </ScrollView>
-        <View style={[s.pickFooter, { borderTopColor: c.border }]}>
-          <TouchableOpacity
-            style={[s.addBtn, { backgroundColor: PRIMARY }, !sel && { opacity: 0.4 }]}
-            disabled={!sel}
-            onPress={() => { onAdd(sel!, qty) }}
-          >
-            <Text style={s.addBtnText}>Agregar · {formatCurrency(price * qty, sign)}</Text>
-          </TouchableOpacity>
-        </View>
-      </SafeAreaView>
-    </Modal>
-  )
-}
-
-// ─── ModifierPicker ───────────────────────────────────────────────────────────
-
-function ModifierPicker({ product, onAdd, onClose }: {
-  product: Product
-  onAdd: (opts: { modifiers: CartModifier[]; quantity: number; notes: string }) => void
-  onClose: () => void
-}) {
-  const c = useAppColors()
-  const { tenant } = useAuthStore()
-  const PRIMARY = tenant?.primaryColor ?? '#2563eb'
-  const sign    = tenant?.currencySign ?? '$'
-  const groups  = product.modifierGroups ?? []
-
-  const defaultSelected = useMemo<Record<string, CartModifier[]>>(() => {
-    const init: Record<string, CartModifier[]> = {}
-    for (const g of groups) {
-      const defs = g.modifiers.filter((m) => m.isDefault)
-      if (defs.length > 0) {
-        init[g.id] = defs.map((m) => ({
-          groupId: g.id, groupName: g.name,
-          modifierId: m.id, modifierName: m.name,
-          priceDelta: parseFloat(m.priceDelta as any) || 0,
-        }))
-      }
-    }
-    return init
-  }, [product.id])
-
-  const [qty, setQty]     = useState(1)
-  const [notes, setNotes] = useState('')
-  const [selected, setSel] = useState<Record<string, CartModifier[]>>(defaultSelected)
-
-  function toggle(g: ModifierGroup, modId: string, modName: string, delta: number) {
-    setSel((prev) => {
-      const cur = prev[g.id] ?? []
-      const exists = cur.find((m) => m.modifierId === modId)
-      if (g.selectionType === 'single') {
-        return exists ? { ...prev, [g.id]: [] } : { ...prev, [g.id]: [{ groupId: g.id, groupName: g.name, modifierId: modId, modifierName: modName, priceDelta: delta }] }
-      }
-      return exists
-        ? { ...prev, [g.id]: cur.filter((m) => m.modifierId !== modId) }
-        : { ...prev, [g.id]: [...cur, { groupId: g.id, groupName: g.name, modifierId: modId, modifierName: modName, priceDelta: delta }] }
-    })
-  }
-
-  const canAdd = () => groups.every((g) => !g.isRequired || (selected[g.id]?.length ?? 0) >= (g.minSelections || 1))
-  const allMods = Object.values(selected).flat()
-  const modsDelta = allMods.reduce((sum, m) => sum + m.priceDelta, 0)
-  const total = (parseFloat(product.price) + modsDelta) * qty
-
-  return (
-    <Modal visible animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
-      <SafeAreaView style={[s.pickRoot, { backgroundColor: c.surface }]}>
-        <View style={[s.pickHeader, { borderBottomColor: c.border }]}>
-          <TouchableOpacity onPress={onClose}><Ionicons name="close" size={24} color={c.textSecondary} /></TouchableOpacity>
-          <Text style={[s.pickTitle, { color: c.text }]} numberOfLines={1}>{product.name}</Text>
-          <View style={{ width: 24 }} />
-        </View>
-        <ScrollView contentContainerStyle={s.pickBody}>
-          <View style={s.qtySection}>
-            <Text style={[s.groupName, { color: c.text }]}>Cantidad</Text>
-            <View style={s.qtyRow}>
-              <TouchableOpacity style={[s.qtyBtn, { borderColor: PRIMARY }]} onPress={() => setQty(Math.max(1, qty - 1))}>
-                <Ionicons name="remove" size={16} color={PRIMARY} />
-              </TouchableOpacity>
-              <Text style={[s.qtyNum, { color: c.text }]}>{qty}</Text>
-              <TouchableOpacity style={[s.qtyBtn, { borderColor: PRIMARY }]} onPress={() => setQty(qty + 1)}>
-                <Ionicons name="add" size={16} color={PRIMARY} />
-              </TouchableOpacity>
-            </View>
-          </View>
-          {groups.map((g) => {
-            const sel = selected[g.id] ?? []
-            return (
-              <View key={g.id} style={s.group}>
-                <View style={s.groupHeader}>
-                  <Text style={[s.groupName, { color: c.text }]}>{g.name}</Text>
-                  <View style={{ flexDirection: 'row', gap: 6, alignItems: 'center' }}>
-                    {g.isRequired && <View style={s.requiredBadge}><Text style={s.requiredText}>Requerido</Text></View>}
-                    <Text style={[s.groupHint, { color: c.textMuted }]}>{g.selectionType === 'single' ? 'Elige 1' : `Hasta ${g.maxSelections ?? '∞'}`}</Text>
-                  </View>
-                </View>
-                <View style={s.modsGrid}>
-                  {g.modifiers.map((mod) => {
-                    const isSel = sel.some((m) => m.modifierId === mod.id)
-                    const delta = parseFloat(mod.priceDelta as any) || 0
-                    return (
-                      <TouchableOpacity
-                        key={mod.id}
-                        style={[s.chip, isSel && { backgroundColor: PRIMARY, borderColor: PRIMARY }]}
-                        onPress={() => toggle(g, mod.id, mod.name, delta)}
-                      >
-                        <Text style={[s.chipText, { color: isSel ? '#fff' : c.textSecondary }]}>{mod.name}</Text>
-                        {delta !== 0 && <Text style={[s.modDelta, { color: isSel ? '#fff' : c.textMuted }]}>{delta > 0 ? '+' : ''}{formatCurrency(delta, sign)}</Text>}
-                      </TouchableOpacity>
-                    )
-                  })}
-                </View>
-              </View>
-            )
-          })}
-          <View style={s.group}>
-            <Text style={[s.groupName, { color: c.text }]}>Notas (opcional)</Text>
-            <TextInput
-              style={[s.notesInput, { borderColor: c.border, backgroundColor: c.surfaceAlt, color: c.text }]}
-              value={notes}
-              onChangeText={setNotes}
-              placeholder="Ej: sin cebolla, extra picante..."
-              placeholderTextColor={c.textMuted}
-              multiline
-            />
-          </View>
-        </ScrollView>
-        <View style={[s.pickFooter, { borderTopColor: c.border }]}>
-          <TouchableOpacity
-            style={[s.addBtn, { backgroundColor: PRIMARY }, !canAdd() && { opacity: 0.5 }]}
-            disabled={!canAdd()}
-            onPress={() => { onAdd({ modifiers: allMods, quantity: qty, notes }); onClose() }}
-          >
-            <Text style={s.addBtnText}>Agregar · {formatCurrency(total, sign)}</Text>
-          </TouchableOpacity>
-        </View>
-      </SafeAreaView>
-    </Modal>
-  )
-}
-
-// ─── SimpleQtyPicker (bottom sheet) ──────────────────────────────────────────
-
-function SimpleQtyPicker({ product, onAdd, onClose }: {
-  product: Product
-  onAdd: (qty: number, notes: string) => void
-  onClose: () => void
-}) {
-  const c = useAppColors()
-  const { tenant } = useAuthStore()
-  const PRIMARY = tenant?.primaryColor ?? '#2563eb'
-  const sign    = tenant?.currencySign ?? '$'
-  const [qty, setQty]     = useState(1)
-  const [notes, setNotes] = useState('')
-  const price = parseFloat(product.price)
-
-  return (
-    <View style={s.sheetBackdrop} pointerEvents="box-none">
-      <TouchableOpacity style={StyleSheet.absoluteFill} onPress={onClose} activeOpacity={1} />
-      <View style={[s.sheet, { backgroundColor: c.surface }]}>
-        <View style={s.handle} />
-        <Text style={[s.sheetName, { color: c.text }]} numberOfLines={2}>{product.name}</Text>
-        <Text style={[s.sheetPrice, { color: c.textMuted }]}>{formatCurrency(price, sign)} c/u</Text>
-        <View style={s.qtyRow}>
-          <TouchableOpacity style={[s.qtyBtn, { borderColor: c.border }]} onPress={() => setQty((q) => Math.max(1, q - 1))}>
-            <Ionicons name="remove" size={22} color={c.text} />
-          </TouchableOpacity>
-          <Text style={[s.qtyNum, { color: c.text }]}>{qty}</Text>
-          <TouchableOpacity style={[s.qtyBtn, { borderColor: c.border }]} onPress={() => setQty((q) => q + 1)}>
-            <Ionicons name="add" size={22} color={c.text} />
-          </TouchableOpacity>
-        </View>
-        <TextInput
-          style={[s.sheetNotesInput, { borderColor: c.border, backgroundColor: c.surfaceAlt, color: c.text }]}
-          value={notes}
-          onChangeText={setNotes}
-          placeholder="Notas (ej: sin azúcar)..."
-          placeholderTextColor={c.textMuted}
-        />
-        <TouchableOpacity style={[s.addBtn, { backgroundColor: PRIMARY }]} onPress={() => onAdd(qty, notes)}>
-          <Text style={s.addBtnText}>Agregar {qty > 1 ? `${qty} · ` : ''}{formatCurrency(price * qty, sign)}</Text>
-        </TouchableOpacity>
-      </View>
-    </View>
-  )
 }
 
 // ─── ProductRow ───────────────────────────────────────────────────────────────
@@ -312,26 +73,40 @@ export function ProductPickerModal({ visible, onClose, onConfirm, title = 'Agreg
   const PRIMARY = tenant?.primaryColor ?? '#2563eb'
   const sign    = tenant?.currencySign ?? '$'
 
-  const { data: prodsData, isLoading: loadingProds } = useQuery({
+  // Product/category data
+  const { data: products = [], isLoading: loadingProds } = useQuery<Product[]>({
     queryKey: ['products'],
-    queryFn: () => api.get<{ data: Product[] }>('/api/tenant/products').then((r) => r.data ?? []),
-    staleTime: 5 * 60_000, gcTime: 24 * 60 * 60_000,
+    queryFn: async () => {
+      const res = await api.get<{ data: Product[] }>('/api/tenant/products')
+      return res.data ?? []
+    },
   })
-  const { data: catsData } = useQuery({
+  const { data: categories = [] } = useQuery<Category[]>({
     queryKey: ['categories'],
-    queryFn: () => api.get<{ data: Category[] }>('/api/tenant/categories').then((r) => r.data ?? []),
-    staleTime: 10 * 60_000, gcTime: 24 * 60 * 60_000,
+    queryFn: async () => {
+      const res = await api.get<{ data: Category[] }>('/api/tenant/categories')
+      return res.data ?? []
+    },
   })
 
-  const products   = (Array.isArray(prodsData) ? prodsData : []).filter((p) => p.isAvailable)
-  const categories = Array.isArray(catsData) ? catsData : []
+  // List navigation state
+  const [catId,  setCatId]  = useState<string | null>(null)
+  const [search, setSearch] = useState('')
+  const [staged, setStaged] = useState<PickedItem[]>([])
+  const [submitting, setSub] = useState(false)
 
-  const [catId,    setCatId]    = useState<string | null>(null)
-  const [search,   setSearch]   = useState('')
-  const [staged,   setStaged]   = useState<PickedItem[]>([])
-  const [pickerProd, setPicker] = useState<Product | null>(null)
-  const [pickerType, setPickerType] = useState<'flavor' | 'modifier' | 'simple' | null>(null)
-  const [submitting, setSub]    = useState(false)
+  // Picker state — shown when a product is tapped or "Libre" is pressed
+  const [pickerProd, setPicker]   = useState<Product | null>(null)
+  const [pickerType, setPickerType] = useState<'flavor' | 'modifier' | 'simple' | 'libre' | null>(null)
+
+  // Shared picker inputs (reset on each product tap)
+  const [qty,        setQty]   = useState(1)
+  const [notes,      setNotes] = useState('')
+  const [selFlavor,  setFlavor] = useState<string | null>(null)
+  const [selMods,    setSelMods] = useState<Record<string, CartModifier[]>>({})
+  // Libre product inputs
+  const [libreName,  setLibreName]  = useState('')
+  const [librePrice, setLibrePrice] = useState('')
 
   const isSearch = search.length > 0
   const activeCategories = useMemo(() => {
@@ -346,16 +121,51 @@ export function ProductPickerModal({ visible, onClose, onConfirm, title = 'Agreg
   }, [products, search, catId, isSearch])
 
   function handleProductTap(product: Product) {
+    setQty(1)
+    setNotes('')
+    setFlavor(null)
+    // Pre-select default modifiers
+    const groups = product.modifierGroups ?? []
+    const defaults: Record<string, CartModifier[]> = {}
+    for (const g of groups) {
+      const defs = g.modifiers.filter((m) => m.isDefault)
+      if (defs.length > 0) {
+        defaults[g.id] = defs.map((m) => ({
+          groupId: g.id, groupName: g.name,
+          modifierId: m.id, modifierName: m.name,
+          priceDelta: parseFloat(m.priceDelta as any) || 0,
+        }))
+      }
+    }
+    setSelMods(defaults)
     setPicker(product)
     if ((product.flavors?.length ?? 0) > 0) setPickerType('flavor')
-    else if ((product.modifierGroups?.length ?? 0) > 0) setPickerType('modifier')
+    else if (groups.length > 0) setPickerType('modifier')
     else setPickerType('simple')
+  }
+
+  function openLibre() {
+    setLibreName('')
+    setLibrePrice('')
+    setQty(1)
+    setPicker(null)
+    setPickerType('libre')
+  }
+
+  function closePicker() {
+    setPicker(null)
+    setPickerType(null)
+    setQty(1)
+    setNotes('')
+    setFlavor(null)
+    setSelMods({})
+    setLibreName('')
+    setLibrePrice('')
   }
 
   function addToStaged(item: PickedItem) {
     setStaged((prev) => [...prev, item])
-    setPicker(null)
-    setPickerType(null)
+    closePicker()
   }
 
   function removeStaged(idx: number) {
@@ -375,7 +185,37 @@ export function ProductPickerModal({ visible, onClose, onConfirm, title = 'Agreg
     }
   }
 
-  function closePicker() { setPicker(null); setPickerType(null) }
+  function handlePickerAdd() {
+    if (pickerType === 'libre') {
+      const price = parseFloat(librePrice) || 0
+      if (!libreName.trim() || price <= 0) return
+      addToStaged({ productId: null, name: libreName.trim(), unitPrice: price, quantity: qty, modifiers: [], notes })
+      return
+    }
+    if (!pickerProd) return
+    const price = parseFloat(pickerProd.price)
+    if (pickerType === 'simple') {
+      addToStaged({ productId: pickerProd.id, name: pickerProd.name, unitPrice: price, quantity: qty, modifiers: [], notes })
+    } else if (pickerType === 'flavor' && selFlavor) {
+      addToStaged({ productId: pickerProd.id, name: pickerProd.name, unitPrice: price, quantity: qty, modifiers: [], notes: `Sabor: ${selFlavor}` })
+    } else if (pickerType === 'modifier') {
+      const groups = pickerProd.modifierGroups ?? []
+      const canAdd = groups.every((g) => !g.isRequired || (selMods[g.id]?.length ?? 0) >= (g.minSelections || 1))
+      if (!canAdd) return
+      const allMods = Object.values(selMods).flat()
+      addToStaged({ productId: pickerProd.id, name: pickerProd.name, unitPrice: price, quantity: qty, modifiers: allMods, notes })
+    }
+  }
+
+  // Compute picker totals for the "Agregar" button label
+  const pickerPrice = pickerType === 'libre' ? (parseFloat(librePrice) || 0) : pickerProd ? parseFloat(pickerProd.price) : 0
+  const modsDelta   = pickerType === 'modifier' ? Object.values(selMods).flat().reduce((s, m) => s + m.priceDelta, 0) : 0
+  const pickerTotal = (pickerPrice + modsDelta) * qty
+
+  const canPickerAdd = pickerType === 'libre' ? (!!libreName.trim() && parseFloat(librePrice) > 0) :
+    pickerType === 'flavor' ? !!selFlavor :
+    pickerType === 'modifier' ? (pickerProd?.modifierGroups ?? []).every((g) => !g.isRequired || (selMods[g.id]?.length ?? 0) >= (g.minSelections || 1)) :
+    true
 
   const showCategories = !isSearch && !catId
   const selectedCat    = catId ? categories.find((c) => c.id === catId) : null
@@ -384,146 +224,289 @@ export function ProductPickerModal({ visible, onClose, onConfirm, title = 'Agreg
     return sum + (i.unitPrice + modsDelta) * i.quantity
   }, 0)
 
+  function toggleMod(g: ModifierGroup, modId: string, modName: string, delta: number) {
+    setSelMods((prev) => {
+      const cur = prev[g.id] ?? []
+      const exists = cur.find((m) => m.modifierId === modId)
+      if (g.selectionType === 'single') {
+        return exists ? { ...prev, [g.id]: [] } : { ...prev, [g.id]: [{ groupId: g.id, groupName: g.name, modifierId: modId, modifierName: modName, priceDelta: delta }] }
+      }
+      return exists
+        ? { ...prev, [g.id]: cur.filter((m) => m.modifierId !== modId) }
+        : { ...prev, [g.id]: [...cur, { groupId: g.id, groupName: g.name, modifierId: modId, modifierName: modName, priceDelta: delta }] }
+    })
+  }
+
   return (
-    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
+    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={pickerProd ? closePicker : onClose}>
       <SafeAreaView style={[s.root, { backgroundColor: c.background }]} edges={['bottom']}>
-        {/* Header */}
-        <View style={[s.header, { borderBottomColor: c.border }]}>
-          <Text style={[s.headerTitle, { color: c.text }]}>{title}</Text>
-          <TouchableOpacity onPress={onClose}>
-            <Ionicons name="close" size={24} color={c.textSecondary} />
-          </TouchableOpacity>
-        </View>
 
-        {/* Search bar */}
-        <View style={[s.searchRow, { borderBottomColor: c.border }]}>
-          <View style={[s.searchWrap, { backgroundColor: c.surfaceAlt, borderColor: c.border }]}>
-            <Ionicons name="search-outline" size={15} color={c.textMuted} />
-            <TextInput
-              style={[s.searchInput, { color: c.text }]}
-              placeholder="Buscar producto..."
-              placeholderTextColor={c.textMuted}
-              value={search}
-              onChangeText={(t) => { setSearch(t); if (t) setCatId(null) }}
-            />
-            {search.length > 0 && (
-              <TouchableOpacity onPress={() => setSearch('')}>
-                <Ionicons name="close-circle" size={15} color={c.textMuted} />
+        {/* ── Picker view (when product selected or libre) ── */}
+        {(pickerProd || pickerType === 'libre') ? (
+          <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+            {/* Header with back button */}
+            <View style={[s.header, { borderBottomColor: c.border }]}>
+              <TouchableOpacity onPress={closePicker} style={{ padding: 2 }}>
+                <Ionicons name="chevron-back" size={26} color={c.textSecondary} />
               </TouchableOpacity>
-            )}
-          </View>
-        </View>
+              <Text style={[s.headerTitle, { color: c.text, flex: 1, textAlign: 'center' }]} numberOfLines={1}>
+                {pickerType === 'libre' ? 'Producto libre' : pickerProd!.name}
+              </Text>
+              <View style={{ width: 30 }} />
+            </View>
 
-        {/* Staged items preview */}
-        {staged.length > 0 && (
-          <View style={[s.staged, { backgroundColor: PRIMARY + '12', borderBottomColor: PRIMARY + '30' }]}>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6, paddingHorizontal: 12, paddingVertical: 8 }}>
-              {staged.map((item, idx) => (
-                <View key={idx} style={[s.stagedChip, { backgroundColor: PRIMARY + '20', borderColor: PRIMARY }]}>
-                  <Text style={[s.stagedChipText, { color: PRIMARY }]} numberOfLines={1}>
-                    {item.quantity}× {item.name}{item.notes ? ` (${item.notes})` : ''}
-                  </Text>
-                  <TouchableOpacity onPress={() => removeStaged(idx)} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
-                    <Ionicons name="close-circle" size={14} color={PRIMARY} />
+            <ScrollView contentContainerStyle={s.pickBody} keyboardShouldPersistTaps="handled">
+              {/* Libre form */}
+              {pickerType === 'libre' && (
+                <>
+                  <View style={s.group}>
+                    <Text style={[s.groupName, { color: c.text }]}>Nombre del producto</Text>
+                    <TextInput
+                      style={[s.notesInput, { borderColor: c.border, backgroundColor: c.surfaceAlt, color: c.text, minHeight: 48, textAlignVertical: 'center' }]}
+                      value={libreName}
+                      onChangeText={setLibreName}
+                      placeholder="Ej: Gaseosa, Agua, Servicio..."
+                      placeholderTextColor={c.textMuted}
+                      autoFocus
+                    />
+                  </View>
+                  <View style={s.group}>
+                    <Text style={[s.groupName, { color: c.text }]}>Precio unitario</Text>
+                    <TextInput
+                      style={[s.notesInput, { borderColor: c.border, backgroundColor: c.surfaceAlt, color: c.text, minHeight: 48, textAlignVertical: 'center' }]}
+                      value={librePrice}
+                      onChangeText={setLibrePrice}
+                      placeholder="0"
+                      placeholderTextColor={c.textMuted}
+                      keyboardType="numeric"
+                    />
+                  </View>
+                </>
+              )}
+
+              {/* Price (non-libre products) */}
+              {pickerType !== 'libre' && (
+                <Text style={[s.sheetPrice, { color: c.textMuted, textAlign: 'center' }]}>
+                  {formatCurrency(pickerPrice, sign)} c/u
+                </Text>
+              )}
+
+              {/* Qty selector (always shown) */}
+              <View style={s.qtySection}>
+                <Text style={[s.groupName, { color: c.text }]}>Cantidad</Text>
+                <View style={s.qtyRow}>
+                  <TouchableOpacity style={[s.qtyBtn, { borderColor: PRIMARY }]} onPress={() => setQty((q) => Math.max(1, q - 1))}>
+                    <Ionicons name="remove" size={22} color={PRIMARY} />
+                  </TouchableOpacity>
+                  <Text style={[s.qtyNum, { color: c.text }]}>{qty}</Text>
+                  <TouchableOpacity style={[s.qtyBtn, { borderColor: PRIMARY }]} onPress={() => setQty((q) => q + 1)}>
+                    <Ionicons name="add" size={22} color={PRIMARY} />
                   </TouchableOpacity>
                 </View>
-              ))}
-            </ScrollView>
-          </View>
-        )}
+              </View>
 
-        {/* Breadcrumb */}
-        {selectedCat && !isSearch && (
-          <TouchableOpacity style={[s.breadcrumb, { borderBottomColor: c.border }]} onPress={() => setCatId(null)}>
-            <Ionicons name="chevron-back" size={16} color={PRIMARY} />
-            <Text style={[s.breadcrumbText, { color: PRIMARY }]}>{selectedCat.emoji} {selectedCat.name}</Text>
-          </TouchableOpacity>
-        )}
-
-        {/* Content */}
-        {showCategories ? (
-          loadingProds ? (
-            <View style={s.centered}><ActivityIndicator size="large" color={PRIMARY} /></View>
-          ) : (
-            <FlatList
-              key="cats"
-              data={activeCategories}
-              keyExtractor={(c) => c.id}
-              numColumns={3}
-              contentContainerStyle={s.catGrid}
-              renderItem={({ item }) => (
-                <TouchableOpacity
-                  style={[s.catCard, { backgroundColor: c.surface, shadowColor: c.shadow }]}
-                  onPress={() => setCatId(item.id)}
-                  activeOpacity={0.75}
-                >
-                  <Text style={s.catEmoji}>{item.emoji ?? '📦'}</Text>
-                  <Text style={[s.catName, { color: c.text }]} numberOfLines={2}>{item.name}</Text>
-                </TouchableOpacity>
+              {/* Flavor picker */}
+              {pickerType === 'flavor' && (
+                <View style={s.group}>
+                  <Text style={[s.groupName, { color: c.text }]}>Elige el sabor</Text>
+                  <View style={s.chipsWrap}>
+                    {pickerProd!.flavors.map((fl) => {
+                      const selected = fl === selFlavor
+                      return (
+                        <TouchableOpacity
+                          key={fl}
+                          style={[s.chip, { borderColor: selected ? PRIMARY : c.border, backgroundColor: selected ? PRIMARY : c.surfaceAlt }]}
+                          onPress={() => setFlavor(fl)}
+                        >
+                          <Text style={[s.chipText, { color: selected ? '#fff' : c.textSecondary }]}>{fl}</Text>
+                        </TouchableOpacity>
+                      )
+                    })}
+                  </View>
+                </View>
               )}
-              ListEmptyComponent={<View style={s.centered}><Text style={{ color: c.textMuted }}>Sin categorías</Text></View>}
-            />
-          )
+
+              {/* Modifier groups */}
+              {pickerType === 'modifier' && (pickerProd!.modifierGroups ?? []).map((g) => {
+                const sel = selMods[g.id] ?? []
+                return (
+                  <View key={g.id} style={s.group}>
+                    <View style={s.groupHeader}>
+                      <Text style={[s.groupName, { color: c.text }]}>{g.name}</Text>
+                      <View style={{ flexDirection: 'row', gap: 6, alignItems: 'center' }}>
+                        {g.isRequired && <View style={s.requiredBadge}><Text style={s.requiredText}>Requerido</Text></View>}
+                        <Text style={[s.groupHint, { color: c.textMuted }]}>{g.selectionType === 'single' ? 'Elige 1' : `Hasta ${g.maxSelections ?? '∞'}`}</Text>
+                      </View>
+                    </View>
+                    <View style={s.modsGrid}>
+                      {g.modifiers.map((mod) => {
+                        const isSel = sel.some((m) => m.modifierId === mod.id)
+                        const delta = parseFloat(mod.priceDelta as any) || 0
+                        return (
+                          <TouchableOpacity
+                            key={mod.id}
+                            style={[s.chip, isSel && { backgroundColor: PRIMARY, borderColor: PRIMARY }]}
+                            onPress={() => toggleMod(g, mod.id, mod.name, delta)}
+                          >
+                            <Text style={[s.chipText, { color: isSel ? '#fff' : c.textSecondary }]}>{mod.name}</Text>
+                            {delta !== 0 && <Text style={[s.modDelta, { color: isSel ? '#fff' : c.textMuted }]}>{delta > 0 ? '+' : ''}{formatCurrency(delta, sign)}</Text>}
+                          </TouchableOpacity>
+                        )
+                      })}
+                    </View>
+                  </View>
+                )
+              })}
+
+              {/* Notes (shown for simple and modifier pickers) */}
+              {(pickerType === 'simple' || pickerType === 'modifier') && (
+                <View style={s.group}>
+                  <Text style={[s.groupName, { color: c.text }]}>Notas (opcional)</Text>
+                  <TextInput
+                    style={[s.notesInput, { borderColor: c.border, backgroundColor: c.surfaceAlt, color: c.text }]}
+                    value={notes}
+                    onChangeText={setNotes}
+                    placeholder="Ej: sin cebolla, extra picante..."
+                    placeholderTextColor={c.textMuted}
+                    multiline
+                  />
+                </View>
+              )}
+            </ScrollView>
+
+            {/* Add button */}
+            <View style={[s.footer, { borderTopColor: c.border }]}>
+              <TouchableOpacity
+                style={[s.confirmBtn, { backgroundColor: PRIMARY }, !canPickerAdd && { opacity: 0.4 }]}
+                onPress={handlePickerAdd}
+                disabled={!canPickerAdd}
+              >
+                <Text style={s.confirmBtnText}>
+                  Agregar {qty > 1 ? `${qty} × ` : ''}{formatCurrency(pickerTotal, sign)}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </KeyboardAvoidingView>
+
         ) : (
-          <FlatList
-            key="prods"
-            data={visibleProducts}
-            keyExtractor={(p) => p.id}
-            contentContainerStyle={{ paddingBottom: 20 }}
-            renderItem={({ item }) => <ProdRow product={item} onPress={() => handleProductTap(item)} />}
-            ListEmptyComponent={<View style={s.centered}><Text style={{ color: c.textMuted }}>Sin resultados</Text></View>}
-          />
-        )}
+          /* ── List view (categories / products) ── */
+          <>
+            {/* Header */}
+            <View style={[s.header, { borderBottomColor: c.border }]}>
+              <Text style={[s.headerTitle, { color: c.text }]}>{title}</Text>
+              <TouchableOpacity onPress={onClose}>
+                <Ionicons name="close" size={24} color={c.textSecondary} />
+              </TouchableOpacity>
+            </View>
 
-        {/* Confirm footer */}
-        {staged.length > 0 && (
-          <View style={[s.footer, { borderTopColor: c.border }]}>
+            {/* Search */}
+            <View style={[s.searchRow, { borderBottomColor: c.border }]}>
+              <View style={[s.searchWrap, { backgroundColor: c.surfaceAlt, borderColor: c.border }]}>
+                <Ionicons name="search-outline" size={15} color={c.textMuted} />
+                <TextInput
+                  style={[s.searchInput, { color: c.text }]}
+                  placeholder="Buscar producto..."
+                  placeholderTextColor={c.textMuted}
+                  value={search}
+                  onChangeText={(t) => { setSearch(t); if (t) setCatId(null) }}
+                />
+                {search.length > 0 && (
+                  <TouchableOpacity onPress={() => setSearch('')}>
+                    <Ionicons name="close-circle" size={15} color={c.textMuted} />
+                  </TouchableOpacity>
+                )}
+              </View>
+            </View>
+
+            {/* Staged items */}
+            {staged.length > 0 && (
+              <View style={[s.staged, { backgroundColor: PRIMARY + '12', borderBottomColor: PRIMARY + '30' }]}>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6, paddingHorizontal: 12, paddingVertical: 8 }}>
+                  {staged.map((item, idx) => (
+                    <View key={idx} style={[s.stagedChip, { backgroundColor: PRIMARY + '20', borderColor: PRIMARY }]}>
+                      <Text style={[s.stagedChipText, { color: PRIMARY }]} numberOfLines={1}>
+                        {item.quantity}× {item.name}{item.notes ? ` (${item.notes})` : ''}
+                      </Text>
+                      <TouchableOpacity onPress={() => removeStaged(idx)} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
+                        <Ionicons name="close-circle" size={14} color={PRIMARY} />
+                      </TouchableOpacity>
+                    </View>
+                  ))}
+                </ScrollView>
+              </View>
+            )}
+
+            {/* Breadcrumb */}
+            {selectedCat && !isSearch && (
+              <TouchableOpacity style={[s.breadcrumb, { borderBottomColor: c.border }]} onPress={() => setCatId(null)}>
+                <Ionicons name="chevron-back" size={16} color={PRIMARY} />
+                <Text style={[s.breadcrumbText, { color: PRIMARY }]}>{selectedCat.emoji} {selectedCat.name}</Text>
+              </TouchableOpacity>
+            )}
+
+            {/* Libre button */}
             <TouchableOpacity
-              style={[s.confirmBtn, { backgroundColor: PRIMARY }, submitting && { opacity: 0.6 }]}
-              onPress={handleConfirm}
-              disabled={submitting}
+              style={[s.libreBtn, { borderColor: c.border, backgroundColor: c.surfaceAlt }]}
+              onPress={openLibre}
+              activeOpacity={0.7}
             >
-              {submitting
-                ? <ActivityIndicator color="#fff" />
-                : <Text style={s.confirmBtnText}>
-                    {confirmLabel} · {staged.reduce((n, i) => n + i.quantity, 0)} ítem(s) · {formatCurrency(stagedTotal, sign)}
-                  </Text>
-              }
+              <Ionicons name="add-circle-outline" size={18} color={PRIMARY} />
+              <Text style={[s.libreBtnText, { color: PRIMARY }]}>Producto libre (precio manual)</Text>
             </TouchableOpacity>
-          </View>
-        )}
 
-        {/* Sub-modals */}
-        {pickerProd && pickerType === 'flavor' && (
-          <FlavorPicker
-            product={pickerProd}
-            onAdd={(flavor, qty) => addToStaged({
-              productId: pickerProd.id, name: pickerProd.name,
-              unitPrice: parseFloat(pickerProd.price), quantity: qty,
-              modifiers: [], notes: `Sabor: ${flavor}`,
-            })}
-            onClose={closePicker}
-          />
-        )}
-        {pickerProd && pickerType === 'modifier' && (
-          <ModifierPicker
-            product={pickerProd}
-            onAdd={({ modifiers, quantity, notes }) => addToStaged({
-              productId: pickerProd.id, name: pickerProd.name,
-              unitPrice: parseFloat(pickerProd.price), quantity, modifiers, notes,
-            })}
-            onClose={closePicker}
-          />
-        )}
-        {pickerProd && pickerType === 'simple' && (
-          <SimpleQtyPicker
-            product={pickerProd}
-            onAdd={(qty, notes) => addToStaged({
-              productId: pickerProd.id, name: pickerProd.name,
-              unitPrice: parseFloat(pickerProd.price), quantity: qty, modifiers: [], notes,
-            })}
-            onClose={closePicker}
-          />
+            {/* Content */}
+            {showCategories ? (
+              loadingProds ? (
+                <View style={s.centered}><ActivityIndicator size="large" color={PRIMARY} /></View>
+              ) : (
+                <FlatList
+                  key="cats"
+                  data={activeCategories}
+                  keyExtractor={(c) => c.id}
+                  numColumns={3}
+                  contentContainerStyle={s.catGrid}
+                  renderItem={({ item }) => (
+                    <TouchableOpacity
+                      style={[s.catCard, { backgroundColor: c.surface, shadowColor: c.shadow }]}
+                      onPress={() => setCatId(item.id)}
+                      activeOpacity={0.75}
+                    >
+                      <Text style={s.catEmoji}>{item.emoji ?? '📦'}</Text>
+                      <Text style={[s.catName, { color: c.text }]} numberOfLines={2}>{item.name}</Text>
+                    </TouchableOpacity>
+                  )}
+                  ListEmptyComponent={<View style={s.centered}><Text style={{ color: c.textMuted }}>Sin categorías</Text></View>}
+                />
+              )
+            ) : (
+              <FlatList
+                key="prods"
+                data={visibleProducts}
+                keyExtractor={(p) => p.id}
+                contentContainerStyle={{ paddingBottom: 20 }}
+                renderItem={({ item }) => <ProdRow product={item} onPress={() => handleProductTap(item)} />}
+                ListEmptyComponent={<View style={s.centered}><Text style={{ color: c.textMuted }}>Sin resultados</Text></View>}
+              />
+            )}
+
+            {/* Confirm footer */}
+            {staged.length > 0 && (
+              <View style={[s.footer, { borderTopColor: c.border }]}>
+                <TouchableOpacity
+                  style={[s.confirmBtn, { backgroundColor: PRIMARY }, submitting && { opacity: 0.6 }]}
+                  onPress={handleConfirm}
+                  disabled={submitting}
+                >
+                  {submitting
+                    ? <ActivityIndicator color="#fff" />
+                    : <Text style={s.confirmBtnText}>
+                        {confirmLabel} · {staged.reduce((n, i) => n + i.quantity, 0)} ítem(s) · {formatCurrency(stagedTotal, sign)}
+                      </Text>
+                  }
+                </TouchableOpacity>
+              </View>
+            )}
+          </>
         )}
       </SafeAreaView>
     </Modal>
@@ -563,12 +546,7 @@ const s = StyleSheet.create({
   confirmBtn:  { borderRadius: 12, padding: 15, alignItems: 'center' },
   confirmBtnText: { color: '#fff', fontWeight: '700', fontSize: 15 },
 
-  // Picker shared styles
-  pickRoot:   { flex: 1 },
-  pickHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 16, borderBottomWidth: 1 },
-  pickTitle:  { fontSize: 16, fontWeight: '700', flex: 1, textAlign: 'center' },
   pickBody:   { padding: 20, gap: 20 },
-  pickFooter: { padding: 20, borderTopWidth: 1 },
 
   group:       { gap: 10 },
   groupHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
@@ -579,7 +557,7 @@ const s = StyleSheet.create({
 
   chipsWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   modsGrid:  { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  chip:      { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 14, paddingVertical: 9, borderRadius: 10, borderWidth: 1.5 },
+  chip:      { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 14, paddingVertical: 9, borderRadius: 10, borderWidth: 1.5, borderColor: '#d1d5db' },
   chipText:  { fontSize: 14, fontWeight: '600' },
   modDelta:  { fontSize: 12 },
 
@@ -594,13 +572,8 @@ const s = StyleSheet.create({
   addBtn:    { borderRadius: 12, padding: 16, alignItems: 'center' },
   addBtnText:{ color: '#fff', fontWeight: '700', fontSize: 16 },
 
-  // Bottom sheet for simple products
-  sheetBackdrop: { position: 'absolute', bottom: 0, left: 0, right: 0, top: 0, justifyContent: 'flex-end' },
-  sheet:         { borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, paddingBottom: 36, gap: 14, shadowOpacity: 0.15, shadowRadius: 20, elevation: 16 },
-  handle:        { width: 40, height: 4, borderRadius: 2, backgroundColor: '#d1d5db', alignSelf: 'center', marginBottom: 4 },
-  sheetName:     { fontSize: 18, fontWeight: '700', textAlign: 'center' },
-  sheetPrice:    { fontSize: 13, textAlign: 'center' },
-  sheetNotesInput: {
-    borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14,
-  },
+  libreBtn:     { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 16, paddingVertical: 11, borderBottomWidth: 1 },
+  libreBtnText: { fontSize: 14, fontWeight: '600' },
+
+  sheetPrice: { fontSize: 14, fontWeight: '600' },
 })

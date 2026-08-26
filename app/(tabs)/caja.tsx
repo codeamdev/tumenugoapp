@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import {
   View, Text, ScrollView, TouchableOpacity, TextInput,
   StyleSheet, Alert, ActivityIndicator, RefreshControl, Modal,
+  KeyboardAvoidingView, Platform,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useRouter } from 'expo-router'
@@ -63,13 +64,14 @@ function OpenModal({ visible, sign, onClose, onDone }: {
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="formSheet" onRequestClose={onClose}>
       <SafeAreaView style={styles.modalRoot}>
+        <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
         <View style={styles.modalHeader}>
           <Text style={styles.modalTitle}>Abrir caja</Text>
           <TouchableOpacity onPress={onClose}>
             <Ionicons name="close" size={24} color={c.textSecondary} />
           </TouchableOpacity>
         </View>
-        <ScrollView contentContainerStyle={styles.modalBody}>
+        <ScrollView contentContainerStyle={styles.modalBody} keyboardShouldPersistTaps="handled">
           <Text style={styles.label}>Monto inicial ({sign})</Text>
           <TextInput
             style={styles.input}
@@ -97,6 +99,7 @@ function OpenModal({ visible, sign, onClose, onDone }: {
               : <Text style={styles.primaryBtnText}>Abrir caja</Text>}
           </TouchableOpacity>
         </ScrollView>
+        </KeyboardAvoidingView>
       </SafeAreaView>
     </Modal>
   )
@@ -148,13 +151,14 @@ function CloseModal({ visible, expected, sign, byPaymentMethod, labels, onClose,
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="formSheet" onRequestClose={onClose}>
       <SafeAreaView style={styles.modalRoot}>
+        <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
         <View style={styles.modalHeader}>
           <Text style={styles.modalTitle}>Cerrar caja</Text>
           <TouchableOpacity onPress={onClose}>
             <Ionicons name="close" size={24} color={c.textSecondary} />
           </TouchableOpacity>
         </View>
-        <ScrollView contentContainerStyle={styles.modalBody}>
+        <ScrollView contentContainerStyle={styles.modalBody} keyboardShouldPersistTaps="handled">
 
           {/* Resumen de ventas por método de pago */}
           {Object.keys(byPaymentMethod).length > 0 && (
@@ -221,6 +225,7 @@ function CloseModal({ visible, expected, sign, byPaymentMethod, labels, onClose,
               : <Text style={styles.primaryBtnText}>Confirmar cierre</Text>}
           </TouchableOpacity>
         </ScrollView>
+        </KeyboardAvoidingView>
       </SafeAreaView>
     </Modal>
   )
@@ -347,7 +352,7 @@ export default function CajaScreen() {
               <KpiCard label="Pedidos" value={String(summary.totalOrders)} icon="receipt-outline" color={PRIMARY} />
               <KpiCard label="Ventas" value={formatCurrency(summary.totalSales, sign)} icon="cash-outline" color={GREEN} />
               <KpiCard label="Propinas" value={formatCurrency(summary.totalTips, sign)} icon="heart-outline" color="#f59e0b" />
-              <KpiCard label="Efectivo esp." value={formatCurrency(summary.expectedCash, sign)} icon="wallet-outline" color="#6366f1" />
+              <KpiCard label="Ef. ventas" value={formatCurrency(summary.byPaymentMethod?.['cash'] ?? 0, sign)} icon="wallet-outline" color="#6366f1" />
             </View>
 
             {/* ── Por método de pago ── */}

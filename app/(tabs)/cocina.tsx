@@ -28,6 +28,7 @@ function KitchenCard({ order, onUpdate, alertMinutes }: { order: Order; onUpdate
   const PRIMARY = tenant?.primaryColor ?? '#2563eb'
   const isSent      = order.status === 'sent'
   const isPreparing = order.status === 'preparing'
+  const isReady     = order.status === 'ready'
 
   const timeRef = order.createdAt
   const elapsedMin = timeRef
@@ -60,15 +61,22 @@ function KitchenCard({ order, onUpdate, alertMinutes }: { order: Order; onUpdate
     if (!isLate) wasLate.current = false
   }, [isLate])
 
+  type KitchenData = { orders: Order[]; alertMinutes: number }
+
   async function advance(status: string) {
+    const removeFromList = status === 'delivered'
     // Optimistic update TanStack Query
-    qc.setQueryData<Order[]>(['kitchen'], (old = []) =>
-      status === 'ready'
-        ? old.filter((o) => o.id !== order.id)
-        : old.map((o) => o.id === order.id ? { ...o, status: status as Order['status'] } : o)
-    )
+    qc.setQueryData<KitchenData>(['kitchen'], (old) => {
+      if (!old) return old
+      return {
+        ...old,
+        orders: removeFromList
+          ? old.orders.filter((o) => o.id !== order.id)
+          : old.orders.map((o) => o.id === order.id ? { ...o, status: status as Order['status'] } : o),
+      }
+    })
     // Optimistic update SQLite
-    if (status === 'ready') {
+    if (removeFromList) {
       removeOrderFromCache(order.id)
     } else {
       updateOrderStatusInCache(order.id, status as Order['status'])
@@ -81,14 +89,17 @@ function KitchenCard({ order, onUpdate, alertMinutes }: { order: Order; onUpdate
       const isNetErr = !isConnected || (err as any)?.status === 0 || err?.message?.includes('Network request failed')
       if (isNetErr) {
         enqueueSync('update_order_status', { orderId: order.id, status })
-        // Mantener cambios optimistas (TQ + SQLite) — OfflineBanner muestra el estado
       } else {
-        // Error de servidor: revertir ambos
-        qc.setQueryData<Order[]>(['kitchen'], (old = []) =>
-          status === 'ready'
-            ? [...(old ?? []), order]
-            : (old ?? []).map((o) => o.id === order.id ? order : o)
-        )
+        // Error de servidor: revertir
+        qc.setQueryData<KitchenData>(['kitchen'], (old) => {
+          if (!old) return old
+          return {
+            ...old,
+            orders: removeFromList
+              ? [...old.orders, order]
+              : old.orders.map((o) => o.id === order.id ? order : o),
+          }
+        })
         upsertOrderInCache(order)
         Alert.alert('Error', err.message)
       }
@@ -106,6 +117,11 @@ function KitchenCard({ order, onUpdate, alertMinutes }: { order: Order; onUpdate
       <View style={styles.cardTop}>
         <View>
           <Text style={styles.cardId}>{order.displayCode ?? '#' + order.id.slice(-6).toUpperCase()}</Text>
+          {order.tableName ? (
+            <Text style={styles.cardTable}>Mesa {order.tableName}</Text>
+          ) : order.type === 'bar' ? (
+            <Text style={styles.cardTable}>Barra</Text>
+          ) : null}
           {order.customerName && <Text style={styles.cardSub}>{order.customerName}</Text>}
         </View>
         <View style={{ alignItems: 'flex-end' }}>
@@ -160,6 +176,12 @@ function KitchenCard({ order, onUpdate, alertMinutes }: { order: Order; onUpdate
             <Text style={styles.actionBtnText}>Listo</Text>
           </TouchableOpacity>
         )}
+        {isReady && (
+          <TouchableOpacity style={[styles.actionBtn, styles.btnDelivered]} onPress={() => advance('delivered')}>
+            <Ionicons name="bicycle-outline" size={16} color="#fff" />
+            <Text style={styles.actionBtnText}>Entregado</Text>
+          </TouchableOpacity>
+        )}
       </View>
     </Animated.View>
   )
@@ -173,38 +195,43 @@ export default function CocinaScreen() {
   const c = useAppColors()
   const styles = makeStyles(c)
   const PRIMARY = tenant?.primaryColor ?? '#2563eb'
-  const alertMinutes = config?.kitchenAlertMinutes ?? 0
 
   const { data, isLoading, isError, isRefetching, refetch } = useQuery({
     queryKey: ['kitchen'],
     queryFn: async () => {
       try {
-        const orders = await api.get<{ data: Order[] }>('/api/tenant/kitchen').then((r) => r.data ?? [])
+        const res = await api.get<{ data: Order[]; alertMinutes?: number }>('/api/tenant/kitchen')
+        const orders = res.data ?? []
         saveKitchenOrdersToCache(orders)
-        return orders
+        return { orders, alertMinutes: res.alertMinutes ?? config?.kitchenAlertMinutes ?? 0 }
       } catch {
         const cached = getKitchenOrdersFromCache()
-        if (cached) return cached
+        if (cached) return { orders: cached, alertMinutes: config?.kitchenAlertMinutes ?? 0 }
         throw new Error('Sin conexión y sin datos guardados')
       }
     },
-    initialData: () => getKitchenOrdersFromCache() ?? undefined,
+    initialData: () => {
+      const cached = getKitchenOrdersFromCache()
+      return cached ? { orders: cached, alertMinutes: config?.kitchenAlertMinutes ?? 0 } : undefined
+    },
     initialDataUpdatedAt: 0,
     refetchInterval: 5_000,
     refetchIntervalInBackground: false,
   })
 
-  const orders   = data ?? []
-  const sent     = orders.filter((o) => o.status === 'sent')
-  const preparing = orders.filter((o) => o.status === 'preparing')
-  const all      = [...sent, ...preparing]
+  const orders     = data?.orders ?? []
+  const alertMinutes = data?.alertMinutes ?? config?.kitchenAlertMinutes ?? 20
+  const sent       = orders.filter((o) => o.status === 'sent')
+  const preparing  = orders.filter((o) => o.status === 'preparing')
+  const ready      = orders.filter((o) => o.status === 'ready')
+  const all        = [...sent, ...preparing, ...ready]
 
   // Sonar cuando llegan pedidos nuevos a cocina
   const knownOrderIds = useRef(new Set<string>())
   const initialLoadDone = useRef(false)
   useEffect(() => {
     if (!data) return
-    const currentIds = new Set(data.map((o) => o.id))
+    const currentIds = new Set(orders.map((o) => o.id))
     if (initialLoadDone.current && [...currentIds].some((id) => !knownOrderIds.current.has(id))) {
       playBeep()
       Vibration.vibrate([0, 200, 100, 200])
@@ -239,6 +266,12 @@ export default function CocinaScreen() {
           <View style={[styles.dot, styles.dotPreparing]} />
           <Text style={styles.counterText}>Preparando: <Text style={{ fontWeight: '700' }}>{preparing.length}</Text></Text>
         </View>
+        {ready.length > 0 && (
+          <View style={styles.counter}>
+            <View style={[styles.dot, styles.dotReady]} />
+            <Text style={styles.counterText}>Listos: <Text style={{ fontWeight: '700' }}>{ready.length}</Text></Text>
+          </View>
+        )}
       </View>
 
       <FlatList
@@ -292,8 +325,9 @@ function makeStyles(c: ReturnType<typeof useAppColors>) {
     lateText: { fontSize: 12, fontWeight: '700', color: '#dc2626', flex: 1 },
 
     cardTop: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 },
-    cardId:  { fontSize: 18, fontWeight: '800', color: c.text },
-    cardSub: { fontSize: 13, color: c.textMuted, marginTop: 2 },
+    cardId:    { fontSize: 18, fontWeight: '800', color: c.text },
+    cardTable: { fontSize: 16, fontWeight: '700', color: c.text, marginTop: 2 },
+    cardSub:   { fontSize: 13, color: c.textMuted, marginTop: 2 },
     cardTime: { fontSize: 11, color: c.textMuted, marginTop: 2 },
     elapsed: { fontSize: 13, fontWeight: '600', color: c.textMuted, marginTop: 2 },
     elapsedUrgent: { color: '#ef4444' },
@@ -320,8 +354,10 @@ function makeStyles(c: ReturnType<typeof useAppColors>) {
       flex: 1, flexDirection: 'row', alignItems: 'center',
       justifyContent: 'center', borderRadius: 10, padding: 12, gap: 6,
     },
-    btnPrepare: { backgroundColor: '#f97316' },
-    btnReady:   { backgroundColor: '#10b981' },
+    btnPrepare:   { backgroundColor: '#f97316' },
+    btnReady:     { backgroundColor: '#10b981' },
+    btnDelivered: { backgroundColor: '#6366f1' },
+    dotReady:     { backgroundColor: '#10b981' },
     actionBtnText: { color: '#fff', fontWeight: '700', fontSize: 14 },
   })
 }

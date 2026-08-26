@@ -31,8 +31,8 @@ const ACTIVE_TABS: { key: OrderStatus | 'all'; label: string }[] = [
 ]
 
 const HIST_TABS: { key: 'all' | 'closed' | 'cancelled'; label: string }[] = [
-  { key: 'all',       label: 'Todos' },
-  { key: 'closed',    label: 'Cerrados' },
+  // 'all' = sólo cerrados (excluye cancelados, que van en su propio tab)
+  { key: 'all',       label: 'Completados' },
   { key: 'cancelled', label: 'Cancelados' },
 ]
 
@@ -53,9 +53,9 @@ function OrderRow({ order, onPress }: { order: Order; onPress: () => void }) {
   return (
     <TouchableOpacity style={s.row} onPress={onPress} activeOpacity={0.75}>
       <View style={{ flex: 1 }}>
-        <Text style={s.rowId}>{order.displayCode ?? `#${order.id.slice(-6).toUpperCase()}`}</Text>
+        <Text style={s.rowOrigin}>{origin}</Text>
         <Text style={s.rowMeta}>
-          {origin}
+          {order.displayCode ?? `#${order.id.slice(-6).toUpperCase()}`}
           {order.customerName ? `  ·  ${order.customerName}` : ''}
           {order.createdAt ? `  ·  ${formatDateTime(order.createdAt)}` : ''}
         </Text>
@@ -78,6 +78,7 @@ function makeOrderRowStyles(c: ReturnType<typeof useAppColors>) {
       marginHorizontal: 12, marginTop: 10, borderRadius: 12, padding: 14,
       shadowColor: c.shadow, shadowOpacity: 0.04, shadowRadius: 6, elevation: 2,
     },
+    rowOrigin:{ fontSize: 16, fontWeight: '700', color: c.text },
     rowId:    { fontSize: 15, fontWeight: '700', color: c.text },
     rowMeta:  { fontSize: 12, color: c.textMuted, marginTop: 2 },
     rowItems: { fontSize: 12, color: c.textMuted, marginTop: 4 },
@@ -205,8 +206,8 @@ function PayModal({ order, onClose, onRefresh }: {
           </TouchableOpacity>
         </View>
 
-        <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-          <ScrollView contentContainerStyle={{ padding: 20, gap: 16 }}>
+        <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+          <ScrollView contentContainerStyle={{ padding: 20, gap: 16 }} keyboardShouldPersistTaps="handled">
 
             {/* Totales */}
             <View style={[s.payTotal, { borderColor: PRIMARY + '40' }]}>
@@ -434,8 +435,8 @@ function DetailModal({ order: orderProp, onClose, onRefresh, onRefreshDetail, re
   const [addOpen, setAddOpen]       = useState(false)
   const [cancellingItem, setCancellingItem] = useState<string | null>(null)
 
-  // Sync internal state when a different order is selected
-  useEffect(() => { setOrder(orderProp) }, [orderProp?.id])
+  // Sync internal state when selected order changes (different ID or refreshed data)
+  useEffect(() => { setOrder(orderProp) }, [orderProp])
 
   if (!order) return null
 
@@ -584,10 +585,13 @@ function DetailModal({ order: orderProp, onClose, onRefresh, onRefreshDetail, re
                 <Text style={[s.badgeText, { color }]}>{label}</Text>
               </View>
               <Text style={s.meta}>Tipo: {ORDER_TYPE_LABELS[order.type] ?? order.type}</Text>
-              {order.tableName    && <Text style={s.meta}>Mesa: {order.tableName}</Text>}
-              {order.customerName && <Text style={s.meta}>Cliente: {order.customerName}</Text>}
-              {order.createdAt    && <Text style={s.meta}>Hora: {formatDateTime(order.createdAt)}</Text>}
-              {order.notes        && <Text style={s.meta}>Nota: {order.notes}</Text>}
+              {order.tableName        && <Text style={s.meta}>Mesa: {order.tableName}</Text>}
+              {order.customerName    && <Text style={s.meta}>Cliente: {order.customerName}</Text>}
+              {order.customerPhone   && <Text style={s.meta}>Tel: {order.customerPhone}</Text>}
+              {order.customerAddress && <Text style={s.meta}>Dirección: {order.customerAddress}</Text>}
+              {order.customerNotes   && <Text style={s.meta}>Nota cliente: {order.customerNotes}</Text>}
+              {order.createdAt       && <Text style={s.meta}>Hora: {formatDateTime(order.createdAt)}</Text>}
+              {order.notes           && <Text style={s.meta}>Nota: {order.notes}</Text>}
             </View>
 
             {order.items && order.items.length > 0 && (
@@ -715,16 +719,22 @@ function DetailModal({ order: orderProp, onClose, onRefresh, onRefreshDetail, re
             try {
               await api.patch(`/api/tenant/orders/${order!.id}`, { action: 'add_items', items: apiItems })
             } catch (err: any) {
-              const isNetErr = !isConnected || err?.message?.includes('Network request failed')
+              const isNetErr = !isConnected || err?.status === 0 || err?.message?.includes('Network request failed')
               if (isNetErr) {
                 enqueueSync('add_order_items', { orderId: order!.id, items: apiItems })
                 Alert.alert('Sin conexión', 'Los productos se agregarán al reconectar.')
               } else {
+                Alert.alert('Error', err.message ?? 'No se pudo agregar el producto')
                 throw err
               }
             }
+            // Refresh detail directly so the total and items update immediately
+            try {
+              const res = await api.get<{ data: Order }>(`/api/tenant/orders/${order!.id}`)
+              setOrder(res.data)
+              if (onRefreshDetail) onRefreshDetail()
+            } catch { /* if fetch fails, parent refresh below covers it */ }
             setAddOpen(false)
-            if (onRefreshDetail) await onRefreshDetail()
             onRefresh()
           }}
         />
@@ -818,7 +828,7 @@ export default function PedidosScreen() {
 
   const filtered = mode === 'active'
     ? (activeTab === 'all' ? activeOrders : activeOrders.filter((o) => o.status === activeTab))
-    : (histTab === 'all' ? historialOrders : historialOrders.filter((o) => o.status === histTab))
+    : (histTab === 'all' ? historialOrders.filter((o) => o.status !== 'cancelled') : historialOrders.filter((o) => o.status === histTab))
 
   async function openDetail(order: Order) {
     try {
