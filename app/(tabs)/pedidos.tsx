@@ -410,7 +410,7 @@ function OrderCard({ listOrder, expanded, onToggle, onRefresh, readOnly }: {
     : ORDER_TYPE_LABELS[order.type] ?? order.type
 
   const canCancel    = !readOnly && !['closed', 'cancelled'].includes(order.status)
-  const canPay       = !readOnly && ['ready', 'delivered'].includes(order.status)
+  const canPay       = !readOnly && order.status === 'delivered'
   const canAdvance   = !readOnly && ['new', 'sent', 'preparing'].includes(order.status)
   const canCancelItem = !readOnly && !['closed', 'cancelled'].includes(order.status)
   const canAddItems  = !readOnly && !['closed', 'cancelled'].includes(order.status)
