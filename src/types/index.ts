@@ -30,8 +30,8 @@ export interface TenantConfig {
   barEnabled?: boolean
 }
 
-// Backend uses 'table' | 'bar' | 'delivery'
-export type OrderType = 'table' | 'bar' | 'delivery'
+// Backend uses 'table' | 'bar' | 'delivery' | 'takeout'
+export type OrderType = 'table' | 'bar' | 'delivery' | 'takeout'
 export type OrderStatus = 'new' | 'sent' | 'preparing' | 'ready' | 'delivered' | 'closed' | 'cancelled'
 export type PaymentMethod = 'cash' | 'card' | 'transfer' | 'nequi' | 'daviplata' | 'other' | 'fiado'
 
@@ -195,6 +195,7 @@ export const ORDER_TYPE_LABELS: Record<OrderType, string> = {
   table: 'Mesa',
   bar: 'Barra',
   delivery: 'Domicilio',
+  takeout: 'Para llevar',
 }
 
 // Record<PaymentMethod,string> forces exhaustiveness: add a key here whenever the union grows.

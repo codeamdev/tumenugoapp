@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useRef } from 'react'
+import { useState, useMemo, useCallback, useRef, useEffect } from 'react'
 import {
   View, Text, FlatList, TouchableOpacity, StyleSheet,
   TextInput, Modal, ScrollView, Alert, ActivityIndicator,
@@ -163,7 +163,8 @@ function ModifiersModal({ product, onAdd, onClose }: {
           <View style={{ width: 24 }} />
         </View>
 
-        <ScrollView contentContainerStyle={s.modBody}>
+        <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+        <ScrollView contentContainerStyle={s.modBody} keyboardShouldPersistTaps="handled">
           {/* Cantidad */}
           <View style={s.qtyRow}>
             <Text style={s.groupName}>Cantidad</Text>
@@ -242,6 +243,7 @@ function ModifiersModal({ product, onAdd, onClose }: {
             </Text>
           </TouchableOpacity>
         </View>
+        </KeyboardAvoidingView>
       </SafeAreaView>
     </Modal>
   )
@@ -546,6 +548,7 @@ function FreeProductModal({ visible, onAdd, onClose }: {
 
   return (
     <Modal visible={visible} animationType="fade" transparent onRequestClose={onClose}>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
       <View style={s.freeOverlay}>
         <View style={s.freeCard}>
           <Text style={s.freeTitle}>Producto libre</Text>
@@ -581,6 +584,7 @@ function FreeProductModal({ visible, onAdd, onClose }: {
           </View>
         </View>
       </View>
+      </KeyboardAvoidingView>
     </Modal>
   )
 }
@@ -630,6 +634,15 @@ function CartModal({ visible, onClose, tables }: {
   const isDelivery    = orderType === 'delivery'
   const total         = subtotal + (isDelivery ? deliveryFeeNum : 0)
 
+  // Al abrir el carrito, pre-seleccionar la primera mesa disponible si el tipo es 'table'
+  useEffect(() => {
+    if (!visible) return
+    if (orderType === 'table' && !tableId) {
+      const first = tables.find((t) => t.status !== 'occupied')
+      if (first) setTable(first.id, first.name)
+    }
+  }, [visible])
+
   async function handleCreate() {
     if (items.length === 0) return
     const needsAddress = dfFields?.address ?? true
@@ -674,6 +687,7 @@ function CartModal({ visible, onClose, tables }: {
       onClose()
       qc.invalidateQueries({ queryKey: ['orders'] })
       qc.invalidateQueries({ queryKey: ['kitchen'] })
+      qc.invalidateQueries({ queryKey: ['tables'] })
       router.push('/(tabs)/pedidos')
     } catch (err: any) {
       const isNetworkError = !isConnected || (err as any)?.status === 0 || err?.message?.includes('Network request failed') || err?.message?.includes('fetch')
@@ -746,9 +760,10 @@ function CartModal({ visible, onClose, tables }: {
     }
   }
 
-  const ORDER_TYPES: { key: 'table' | 'bar' | 'delivery'; label: string }[] = [
+  const ORDER_TYPES: { key: 'table' | 'bar' | 'delivery' | 'takeout'; label: string }[] = [
     { key: 'table', label: 'Mesa' },
     ...(config?.barEnabled ? [{ key: 'bar' as const, label: 'Barra' }] : []),
+    { key: 'takeout', label: 'Para llevar' },
     { key: 'delivery', label: 'Domicilio' },
   ]
 
@@ -766,8 +781,8 @@ function CartModal({ visible, onClose, tables }: {
           </TouchableOpacity>
         </View>
 
-        <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-          <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 16 }}>
+        <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+          <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 16 }} keyboardShouldPersistTaps="handled">
 
             {/* Tipo de pedido */}
             <View style={s.section}>
@@ -781,6 +796,14 @@ function CartModal({ visible, onClose, tables }: {
                       setOrderType(t.key)
                       if (t.key === 'delivery' && config?.defaultDeliveryFee && !deliveryFee) {
                         setDeliveryFee(String(config.defaultDeliveryFee))
+                      }
+                      if (t.key === 'table') {
+                        if (!tableId) {
+                          const first = tables.find((tb) => tb.status !== 'occupied')
+                          if (first) setTable(first.id, first.name)
+                        }
+                      } else {
+                        setTable(null, null)
                       }
                     }}
                   >
