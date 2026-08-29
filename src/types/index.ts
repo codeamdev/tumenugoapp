@@ -149,6 +149,7 @@ export interface CajaSummary {
   totalTips: number
   byPaymentMethod: Record<string, number>
   expectedCash: number
+  openingAmount: number
 }
 
 export interface CartModifier {

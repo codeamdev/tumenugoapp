@@ -129,9 +129,7 @@ function CloseModal({ visible, openingAmount, sign, byPaymentMethod, labels, onC
   ]
 
   function getExpected(method: string) {
-    return method === 'cash'
-      ? openingAmount + (byPaymentMethod['cash'] ?? 0)
-      : (byPaymentMethod[method] ?? 0)
+    return byPaymentMethod[method] ?? 0
   }
 
   async function submit() {
@@ -190,7 +188,7 @@ function CloseModal({ visible, openingAmount, sign, byPaymentMethod, labels, onC
                 </View>
                 {method === 'cash' && openingAmount > 0 && (
                   <Text style={[styles.methodBlockSub, { color: c.textMuted }]}>
-                    Base {formatCurrency(openingAmount, sign)} + Ventas {formatCurrency(byPaymentMethod['cash'] ?? 0, sign)}
+                    Fondo inicial {formatCurrency(openingAmount, sign)} — no incluir en el conteo
                   </Text>
                 )}
                 <TextInput
