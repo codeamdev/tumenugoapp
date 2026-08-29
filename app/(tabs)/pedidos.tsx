@@ -120,6 +120,7 @@ function PayModal({ order, onClose, onRefresh }: {
         customerName: isCredit ? customerName.trim() : undefined,
         paymentNotes: isCredit ? paymentNotes.trim() : undefined,
       })
+      qc.invalidateQueries({ queryKey: ['tables'] })
       onRefresh()
       onClose()
     } catch (err: any) {
@@ -214,6 +215,12 @@ function PayModal({ order, onClose, onRefresh }: {
                 )}
                 {!isCredit && (
                   <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
+                    <TouchableOpacity
+                      style={[s.quickBtn, { borderColor: PRIMARY, backgroundColor: PRIMARY }]}
+                      onPress={() => updateRow(idx, 'amount', String(Math.round(grandTotal)))}
+                    >
+                      <Text style={[s.quickBtnText, { color: '#fff' }]}>Exacto</Text>
+                    </TouchableOpacity>
                     {QUICK_AMOUNTS.map((amt) => (
                       <TouchableOpacity
                         key={amt}
@@ -356,7 +363,7 @@ function OrderCard({ listOrder, expanded, onToggle, onRefresh, readOnly }: {
     : ORDER_TYPE_LABELS[order.type] ?? order.type
 
   const canCancel    = !readOnly && !['closed', 'cancelled'].includes(order.status)
-  const canPay       = !readOnly && order.status === 'ready'
+  const canPay       = !readOnly && !['closed', 'cancelled'].includes(order.status)
   const canAdvance   = !readOnly && ['new', 'sent', 'preparing'].includes(order.status)
   const canCancelItem = !readOnly && !['closed', 'cancelled'].includes(order.status)
   const canAddItems  = !readOnly && !['closed', 'cancelled'].includes(order.status)
@@ -403,6 +410,7 @@ function OrderCard({ listOrder, expanded, onToggle, onRefresh, readOnly }: {
           setActionLoading(true)
           try {
             await api.patch(`/api/tenant/orders/${order.id}`, { status: 'cancelled' })
+            qc.invalidateQueries({ queryKey: ['tables'] })
             onToggle(); onRefresh()
           } catch (err: any) {
             setOrder(listOrder)
@@ -431,6 +439,7 @@ function OrderCard({ listOrder, expanded, onToggle, onRefresh, readOnly }: {
             await api.delete(`/api/tenant/orders/${order.id}`)
             qc.setQueryData<Order[]>(['orders', 'active'], (old = []) => old.filter((o) => o.id !== order.id))
             qc.setQueryData<Order[]>(['orders', 'historial'], (old = []) => old?.filter((o) => o.id !== order.id))
+            qc.invalidateQueries({ queryKey: ['tables'] })
             onRefresh()
           } catch (err: any) {
             Alert.alert('Error', err.message ?? 'No se pudo eliminar el pedido')
