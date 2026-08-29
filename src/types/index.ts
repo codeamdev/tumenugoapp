@@ -139,6 +139,7 @@ export interface CashRegister {
   expectedCash: string | null
   countedCash: string | null
   difference: string | null
+  countedByMethod?: Record<string, number> | null
   notes: string | null
   status: string
 }
