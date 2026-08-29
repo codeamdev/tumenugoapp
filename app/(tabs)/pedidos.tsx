@@ -381,9 +381,12 @@ function OrderCard({ listOrder, expanded, onToggle, onRefresh, readOnly }: {
   const [payOpen, setPayOpen]       = useState(false)
   const [addOpen, setAddOpen]       = useState(false)
   const [cancellingItem, setCancellingItem] = useState<string | null>(null)
+  const [notesDraft, setNotesDraft] = useState(listOrder.notes ?? '')
+  const [savingNotes, setSavingNotes] = useState(false)
+  const [editingNotes, setEditingNotes] = useState(false)
 
   // Sync from list when not expanded (list data updates via refetch)
-  useEffect(() => { if (!expanded) setOrder(listOrder) }, [listOrder, expanded])
+  useEffect(() => { if (!expanded) { setOrder(listOrder); setNotesDraft(listOrder.notes ?? '') } }, [listOrder, expanded])
 
   // Fetch full order (with items) when expanded
   useEffect(() => {
@@ -403,12 +406,24 @@ function OrderCard({ listOrder, expanded, onToggle, onRefresh, readOnly }: {
     onRefresh()
   }
 
+  async function saveNotes() {
+    setSavingNotes(true)
+    try {
+      await api.patch(`/api/tenant/orders/${order.id}`, { notes: notesDraft })
+      setOrder((prev) => ({ ...prev, notes: notesDraft }))
+      setEditingNotes(false)
+    } catch (err: any) {
+      Alert.alert('Error', err.message ?? 'No se pudo guardar la nota')
+    } finally { setSavingNotes(false) }
+  }
+
   const color = ORDER_STATUS_COLORS[order.status] ?? '#6b7280'
   const label = ORDER_STATUS_LABELS[order.status] ?? order.status
   const origin = order.tableName
     ? `Mesa ${order.tableName}`
     : ORDER_TYPE_LABELS[order.type] ?? order.type
 
+  const canEditNotes = !readOnly && !['closed', 'cancelled'].includes(order.status)
   const canCancel    = !readOnly && !['closed', 'cancelled'].includes(order.status)
   const canPay       = !readOnly && order.status === 'delivered'
   const canAdvance   = !readOnly && ['new', 'sent', 'preparing'].includes(order.status)
@@ -560,7 +575,46 @@ function OrderCard({ listOrder, expanded, onToggle, onRefresh, readOnly }: {
                   {order.customerPhone  && <Text style={s.meta}>Tel: {order.customerPhone}</Text>}
                   {order.customerAddress && <Text style={s.meta}>Dirección: {order.customerAddress}</Text>}
                   {order.customerNotes  && <Text style={s.meta}>Nota cliente: {order.customerNotes}</Text>}
-                  {order.notes          && <Text style={s.meta}>Nota: {order.notes}</Text>}
+
+                  {/* Nota del pedido — editable */}
+                  {canEditNotes ? (
+                    editingNotes ? (
+                      <View style={{ marginTop: 6, gap: 6 }}>
+                        <TextInput
+                          style={[s.notesInput, { borderColor: PRIMARY, color: c.text, backgroundColor: c.surfaceAlt }]}
+                          value={notesDraft}
+                          onChangeText={setNotesDraft}
+                          placeholder="Notas del pedido..."
+                          placeholderTextColor={c.textMuted}
+                          multiline
+                          autoFocus
+                        />
+                        <View style={{ flexDirection: 'row', gap: 8 }}>
+                          <TouchableOpacity
+                            style={[s.notesSaveBtn, { backgroundColor: PRIMARY }, savingNotes && { opacity: 0.6 }]}
+                            onPress={saveNotes}
+                            disabled={savingNotes}
+                          >
+                            <Text style={s.notesSaveBtnText}>{savingNotes ? 'Guardando...' : 'Guardar'}</Text>
+                          </TouchableOpacity>
+                          <TouchableOpacity
+                            style={s.notesCancelBtn}
+                            onPress={() => { setNotesDraft(order.notes ?? ''); setEditingNotes(false) }}
+                          >
+                            <Text style={[s.notesSaveBtnText, { color: c.textSecondary }]}>Cancelar</Text>
+                          </TouchableOpacity>
+                        </View>
+                      </View>
+                    ) : (
+                      <TouchableOpacity onPress={() => setEditingNotes(true)} style={{ marginTop: 4 }}>
+                        <Text style={[s.meta, { color: order.notes ? c.text : c.textMuted }]}>
+                          {order.notes ? `📝 ${order.notes}` : '📝 Agregar nota...'}
+                        </Text>
+                      </TouchableOpacity>
+                    )
+                  ) : (
+                    order.notes ? <Text style={s.meta}>📝 {order.notes}</Text> : null
+                  )}
                 </View>
 
                 {/* Productos */}
@@ -749,6 +803,11 @@ function makeCardStyles(c: ReturnType<typeof useAppColors>) {
     totalRow:  { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 14, borderBottomWidth: 1, borderBottomColor: c.border },
     totalLabel:{ fontSize: 14, fontWeight: '600', color: c.textSecondary },
     totalValue:{ fontSize: 20, fontWeight: '800' },
+
+    notesInput: { borderWidth: 1, borderRadius: 8, padding: 10, fontSize: 13, minHeight: 60, textAlignVertical: 'top' },
+    notesSaveBtn: { flex: 1, borderRadius: 8, padding: 9, alignItems: 'center' },
+    notesCancelBtn: { flex: 1, borderRadius: 8, padding: 9, alignItems: 'center', borderWidth: 1, borderColor: '#d1d5db' },
+    notesSaveBtnText: { fontSize: 13, fontWeight: '700', color: '#fff' },
 
     actions: { padding: 14, gap: 8 },
     actionBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, borderRadius: 10, padding: 12 },
