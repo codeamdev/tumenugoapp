@@ -225,6 +225,12 @@ function PayModal({ order, onClose, onRefresh }: {
               <View style={{ gap: 6 }}>
                 <Text style={s.payLabel}>Monto rápido</Text>
                 <View style={s.quickRow}>
+                  <TouchableOpacity
+                    style={[s.quickBtn, { borderColor: PRIMARY, backgroundColor: PRIMARY }]}
+                    onPress={() => updateRow(0, 'amount', String(Math.round(grandTotal)))}
+                  >
+                    <Text style={[s.quickBtnText, { color: '#fff' }]}>Exacto</Text>
+                  </TouchableOpacity>
                   {QUICK_AMOUNTS.map((amt) => (
                     <TouchableOpacity
                       key={amt}
@@ -234,12 +240,6 @@ function PayModal({ order, onClose, onRefresh }: {
                       <Text style={[s.quickBtnText, { color: PRIMARY }]}>+{amt >= 1000 ? `${amt / 1000}k` : amt}</Text>
                     </TouchableOpacity>
                   ))}
-                  <TouchableOpacity
-                    style={[s.quickBtn, { borderColor: PRIMARY, backgroundColor: PRIMARY + '18' }]}
-                    onPress={() => updateRow(0, 'amount', String(Math.round(grandTotal)))}
-                  >
-                    <Text style={[s.quickBtnText, { color: PRIMARY }]}>Exacto</Text>
-                  </TouchableOpacity>
                 </View>
               </View>
             )}
