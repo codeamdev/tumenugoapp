@@ -107,9 +107,9 @@ function OpenModal({ visible, sign, onClose, onDone }: {
 
 // ─── Modal: Cerrar caja ───────────────────────────────────────────────────────
 
-function CloseModal({ visible, expected, sign, byPaymentMethod, labels, onClose, onDone }: {
+function CloseModal({ visible, openingAmount, sign, byPaymentMethod, labels, onClose, onDone }: {
   visible: boolean
-  expected: number
+  openingAmount: number
   sign: string
   byPaymentMethod: Record<string, number>
   labels: Record<string, string>
@@ -119,33 +119,45 @@ function CloseModal({ visible, expected, sign, byPaymentMethod, labels, onClose,
   const { isConnected } = useNetworkStatus()
   const c = useAppColors()
   const styles = makeStyles(c)
-  const [counted, setCounted] = useState('')
-  const [notes, setNotes]     = useState('')
+  const [countedByMethod, setCountedByMethod] = useState<Record<string, string>>({})
+  const [notes, setNotes] = useState('')
   const [loading, setLoading] = useState(false)
 
-  const diff = (parseFloat(counted) || 0) - expected
+  const methodsToShow = [
+    'cash',
+    ...Object.keys(byPaymentMethod).filter((k) => k !== 'cash' && (byPaymentMethod[k] ?? 0) > 0),
+  ]
+
+  function getExpected(method: string) {
+    return method === 'cash'
+      ? openingAmount + (byPaymentMethod['cash'] ?? 0)
+      : (byPaymentMethod[method] ?? 0)
+  }
 
   async function submit() {
     if (!isConnected) {
       Alert.alert('Sin conexión', 'Las operaciones de caja requieren conexión a internet.')
       return
     }
-    if (counted !== '' && Math.abs(diff) > 0.01 && !notes.trim()) {
-      Alert.alert('Observación requerida', 'Debes ingresar una observación cuando hay diferencia en el arqueo.')
-      return
-    }
     setLoading(true)
     try {
+      const countedByMethodNums: Record<string, number> = {}
+      for (const m of methodsToShow) {
+        countedByMethodNums[m] = parseFloat(countedByMethod[m] ?? '0') || 0
+      }
       await api.post('/api/tenant/caja', {
         action: 'close',
-        countedCash: parseFloat(counted) || 0,
+        countedByMethod: countedByMethodNums,
         notes: notes || undefined,
       })
-      setCounted(''); setNotes('')
+      setCountedByMethod({})
+      setNotes('')
       onDone()
     } catch (err: any) {
       Alert.alert('Error', err.message)
-    } finally { setLoading(false) }
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
@@ -160,56 +172,53 @@ function CloseModal({ visible, expected, sign, byPaymentMethod, labels, onClose,
         </View>
         <ScrollView contentContainerStyle={styles.modalBody} keyboardShouldPersistTaps="handled">
 
-          {/* Resumen de ventas por método de pago */}
-          {Object.keys(byPaymentMethod).length > 0 && (
-            <View style={[styles.summaryBox, { backgroundColor: c.surfaceAlt, borderColor: c.border }]}>
-              <Text style={[styles.summaryTitle, { color: c.text }]}>Resumen de ventas</Text>
-              {Object.entries(byPaymentMethod).map(([key, val]) => (
-                <View key={key} style={styles.summaryRow}>
-                  <Text style={[styles.summaryLabel, { color: c.textSecondary }]}>{labels[key] ?? key}</Text>
-                  <Text style={[styles.summaryValue, { color: c.text }]}>{formatCurrency(val, sign)}</Text>
+          {methodsToShow.map((method) => {
+            const expectedVal = getExpected(method)
+            const rawCounted = countedByMethod[method] ?? ''
+            const countedVal = parseFloat(rawCounted) || 0
+            const diff = rawCounted !== '' ? countedVal - expectedVal : null
+
+            return (
+              <View key={method} style={[styles.methodBlock, { borderColor: c.border }]}>
+                <View style={styles.methodBlockHeader}>
+                  <Text style={[styles.methodBlockLabel, { color: c.text }]}>
+                    {labels[method] ?? method}
+                  </Text>
+                  <Text style={[styles.methodBlockExpected, { color: c.textSecondary }]}>
+                    Esperado: {formatCurrency(expectedVal, sign)}
+                  </Text>
                 </View>
-              ))}
-              <View style={[styles.summaryDivider, { borderTopColor: c.border }]} />
-              <View style={styles.summaryRow}>
-                <Text style={[styles.summaryLabel, { color: c.text, fontWeight: '700' }]}>Total ventas</Text>
-                <Text style={[styles.summaryValue, { color: c.text, fontWeight: '800' }]}>
-                  {formatCurrency(Object.values(byPaymentMethod).reduce((s, v) => s + v, 0), sign)}
-                </Text>
+                {method === 'cash' && openingAmount > 0 && (
+                  <Text style={[styles.methodBlockSub, { color: c.textMuted }]}>
+                    Base {formatCurrency(openingAmount, sign)} + Ventas {formatCurrency(byPaymentMethod['cash'] ?? 0, sign)}
+                  </Text>
+                )}
+                <TextInput
+                  style={[styles.input, { marginTop: 6 }]}
+                  keyboardType="numeric"
+                  placeholder="0"
+                  placeholderTextColor={c.textMuted}
+                  value={rawCounted ? parseInt(rawCounted, 10).toLocaleString('es-CO') : ''}
+                  onChangeText={(text) =>
+                    setCountedByMethod((prev) => ({ ...prev, [method]: text.replace(/\D/g, '') }))
+                  }
+                />
+                {diff !== null && (
+                  <View style={[styles.diffBox, diff >= 0 ? styles.diffPos : styles.diffNeg, { marginTop: 6 }]}>
+                    <Text style={styles.diffLabel}>Diferencia</Text>
+                    <Text style={styles.diffValue}>
+                      {diff >= 0 ? '+' : ''}{formatCurrency(diff, sign)}
+                    </Text>
+                  </View>
+                )}
               </View>
-            </View>
-          )}
+            )
+          })}
 
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Efectivo esperado en caja</Text>
-            <Text style={styles.infoValue}>{formatCurrency(expected, sign)}</Text>
-          </View>
-
-          <Text style={styles.label}>Efectivo contado ({sign})</Text>
-          <TextInput
-            style={styles.input}
-            keyboardType="numeric"
-            placeholder="0"
-            placeholderTextColor={c.textMuted}
-            value={counted ? parseInt(counted, 10).toLocaleString('es-CO') : ''}
-            onChangeText={(text) => setCounted(text.replace(/\D/g, ''))}
-          />
-
-          {counted !== '' && (
-            <View style={[styles.diffBox, diff >= 0 ? styles.diffPos : styles.diffNeg]}>
-              <Text style={styles.diffLabel}>Diferencia</Text>
-              <Text style={styles.diffValue}>
-                {diff >= 0 ? '+' : ''}{formatCurrency(diff, sign)}
-              </Text>
-            </View>
-          )}
-
-          <Text style={styles.label}>
-            Notas{counted !== '' && Math.abs(diff) > 0.01 ? ' *' : ' (opcional)'}
-          </Text>
+          <Text style={styles.label}>Notas (opcional)</Text>
           <TextInput
             style={[styles.input, styles.inputMulti]}
-            placeholder={counted !== '' && Math.abs(diff) > 0.01 ? 'Explica la diferencia...' : 'Observaciones del arqueo...'}
+            placeholder="Observaciones del arqueo..."
             placeholderTextColor={c.textMuted}
             value={notes}
             onChangeText={setNotes}
@@ -408,7 +417,7 @@ export default function CajaScreen() {
       />
       <CloseModal
         visible={closeModal}
-        expected={summary?.expectedCash ?? 0}
+        openingAmount={parseFloat(reg?.openingAmount ?? '0')}
         sign={sign}
         byPaymentMethod={summary?.byPaymentMethod ?? {}}
         labels={labels}
@@ -523,5 +532,11 @@ function makeStyles(c: ReturnType<typeof useAppColors>) {
       backgroundColor: '#ef4444', borderRadius: 12, padding: 14, gap: 8, marginTop: 8,
     },
     btnDisabled: { opacity: 0.5 },
+
+    methodBlock:         { borderWidth: 1, borderRadius: 12, padding: 14 },
+    methodBlockHeader:   { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+    methodBlockLabel:    { fontSize: 15, fontWeight: '700' },
+    methodBlockExpected: { fontSize: 13 },
+    methodBlockSub:      { fontSize: 12, marginTop: 4 },
   })
 }
