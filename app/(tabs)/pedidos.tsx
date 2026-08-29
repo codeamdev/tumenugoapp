@@ -426,15 +426,15 @@ function OrderCard({ listOrder, expanded, onToggle, onRefresh, readOnly }: {
   const canEditNotes = !readOnly && !['closed', 'cancelled'].includes(order.status)
   const canCancel    = !readOnly && !['closed', 'cancelled'].includes(order.status)
   const canPay       = !readOnly && order.status === 'delivered'
-  const canAdvance   = !readOnly && ['new', 'sent', 'preparing'].includes(order.status)
+  const canAdvance   = !readOnly && ['new', 'sent', 'preparing', 'ready'].includes(order.status)
   const canCancelItem = !readOnly && !['closed', 'cancelled'].includes(order.status)
   const canAddItems  = !readOnly && !['closed', 'cancelled'].includes(order.status)
 
   const ADVANCE_LABELS: Partial<Record<string, string>> = {
-    new: 'Enviar a cocina', sent: 'Marcar preparando', preparing: 'Marcar listo',
+    new: 'Enviar a cocina', sent: 'Marcar preparando', preparing: 'Marcar listo', ready: 'Marcar entregado',
   }
   const NEXT_STATUS: Record<string, string> = {
-    new: 'sent', sent: 'preparing', preparing: 'ready',
+    new: 'sent', sent: 'preparing', preparing: 'ready', ready: 'delivered',
   }
 
   function applyOptimisticStatus(status: string) {
