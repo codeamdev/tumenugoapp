@@ -153,9 +153,10 @@ function PayModal({ order, onClose, onRefresh }: {
           </TouchableOpacity>
         </View>
 
-        <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-          <ScrollView contentContainerStyle={{ padding: 20, gap: 16 }} keyboardShouldPersistTaps="handled">
+        <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+          <ScrollView contentContainerStyle={{ padding: 20, gap: 16 }}>
 
+            {/* Totales */}
             <View style={[s.payTotal, { borderColor: PRIMARY + '40' }]}>
               <View style={{ flex: 1, gap: 4 }}>
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
@@ -163,120 +164,140 @@ function PayModal({ order, onClose, onRefresh }: {
                   <Text style={[s.payTotalLabel, { color: c.text }]}>{formatCurrency(orderTotal, sign)}</Text>
                 </View>
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 4, paddingTop: 4, borderTopWidth: 1, borderTopColor: PRIMARY + '30' }}>
-                  <Text style={[s.payTotalLabel, { fontWeight: '800', color: PRIMARY }]}>Recibido</Text>
-                  <Text style={[s.payTotalLabel, { fontWeight: '800', color: PRIMARY }]}>{formatCurrency(totalPaid, sign)}</Text>
+                  <Text style={[s.payTotalLabel, { fontWeight: '700' }]}>Total</Text>
+                  <Text style={[s.payTotalValue, { color: PRIMARY }]}>{formatCurrency(grandTotal, sign)}</Text>
                 </View>
-                {!isCredit && remaining > 0 && (
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                    <Text style={[s.payTotalLabel, { color: '#ef4444' }]}>Falta</Text>
-                    <Text style={[s.payTotalLabel, { color: '#ef4444' }]}>{formatCurrency(remaining, sign)}</Text>
-                  </View>
-                )}
-                {!isCredit && totalPaid > grandTotal && (
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                    <Text style={[s.payTotalLabel, { color: '#10b981' }]}>Cambio</Text>
-                    <Text style={[s.payTotalLabel, { color: '#10b981' }]}>{formatCurrency(totalPaid - grandTotal, sign)}</Text>
-                  </View>
-                )}
               </View>
             </View>
 
-            {payments.map((p, idx) => (
-              <View key={idx} style={s.payRow}>
-                <View style={[s.methodSelect, { borderColor: c.border, backgroundColor: c.surfaceAlt }]}>
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6, padding: 4 }}>
+            {/* Pagos */}
+            <View style={{ gap: 8 }}>
+              <Text style={s.payLabel}>Pagos</Text>
+              {payments.map((row, idx) => (
+                <View key={idx} style={s.payRow}>
+                  {/* Selector de método */}
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ maxHeight: 38 }} contentContainerStyle={{ gap: 6, paddingRight: 4 }}>
                     {methods.map((m) => (
                       <TouchableOpacity
                         key={m.key}
-                        style={[s.methodChip, p.method === m.key && { backgroundColor: PRIMARY }]}
+                        style={[s.methodChip, row.method === m.key && { backgroundColor: PRIMARY, borderColor: PRIMARY }]}
                         onPress={() => updateRow(idx, 'method', m.key)}
                       >
-                        <Text style={[s.methodChipText, { color: p.method === m.key ? '#fff' : c.textSecondary }]}>{m.label}</Text>
+                        <Text style={[s.methodChipText, row.method === m.key && { color: c.textInverse }]}>{m.label}</Text>
                       </TouchableOpacity>
                     ))}
                   </ScrollView>
+                  {isCredit ? (
+                    <View style={{ marginTop: 8, padding: 10, backgroundColor: c.surfaceAlt, borderRadius: 10, borderWidth: 1, borderColor: c.border }}>
+                      <Text style={{ fontSize: 14, color: c.textSecondary }}>Total a registrar como deuda:</Text>
+                      <Text style={{ fontSize: 20, fontWeight: '800', color: c.text, marginTop: 2 }}>{formatCurrency(grandTotal, sign)}</Text>
+                    </View>
+                  ) : (
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8 }}>
+                      <TextInput
+                        style={[s.payInput, { flex: 1 }]}
+                        keyboardType="numeric"
+                        placeholder={`Monto (${sign})`}
+                        placeholderTextColor={c.textMuted}
+                        value={fmtNum(row.amount)}
+                        onChangeText={(v) => updateRow(idx, 'amount', v)}
+                      />
+                      {payments.length > 1 && (
+                        <TouchableOpacity onPress={() => removeRow(idx)} style={s.removePayBtn}>
+                          <Ionicons name="trash-outline" size={18} color={c.danger} />
+                        </TouchableOpacity>
+                      )}
+                    </View>
+                  )}
                 </View>
-                {!isCredit && (
-                  <View style={s.amountRow}>
-                    <TextInput
-                      style={[s.amountInput, { borderColor: c.border, backgroundColor: c.surfaceAlt, color: c.text }]}
-                      value={fmtNum(p.amount)}
-                      onChangeText={(v) => updateRow(idx, 'amount', v.replace(/\D/g, ''))}
-                      keyboardType="numeric"
-                      placeholder="Monto"
-                      placeholderTextColor={c.textMuted}
-                    />
-                    {payments.length > 1 && (
-                      <TouchableOpacity onPress={() => removeRow(idx)} style={s.removeRowBtn}>
-                        <Ionicons name="close-circle" size={22} color={c.danger} />
-                      </TouchableOpacity>
-                    )}
-                  </View>
-                )}
-                {!isCredit && (
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
-                    <TouchableOpacity
-                      style={[s.quickBtn, { borderColor: PRIMARY, backgroundColor: PRIMARY }]}
-                      onPress={() => updateRow(idx, 'amount', String(Math.round(grandTotal)))}
-                    >
-                      <Text style={[s.quickBtnText, { color: '#fff' }]}>Exacto</Text>
-                    </TouchableOpacity>
-                    {QUICK_AMOUNTS.map((amt) => (
-                      <TouchableOpacity
-                        key={amt}
-                        style={[s.quickBtn, { borderColor: PRIMARY }]}
-                        onPress={() => updateRow(idx, 'amount', String(amt))}
-                      >
-                        <Text style={[s.quickBtnText, { color: PRIMARY }]}>{formatCurrency(amt, sign)}</Text>
-                      </TouchableOpacity>
-                    ))}
-                  </ScrollView>
-                )}
-              </View>
-            ))}
+              ))}
 
+              {!isCredit && (
+                <TouchableOpacity style={[s.addPayBtn, { borderColor: PRIMARY }]} onPress={addRow}>
+                  <Ionicons name="add-circle-outline" size={16} color={PRIMARY} />
+                  <Text style={[s.addPayBtnText, { color: PRIMARY }]}>Agregar método</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+
+            {/* Botones de monto rápido (ocultos para crédito) */}
+            {!isCredit && (
+              <View style={{ gap: 6 }}>
+                <Text style={s.payLabel}>Monto rápido</Text>
+                <View style={s.quickRow}>
+                  {QUICK_AMOUNTS.map((amt) => (
+                    <TouchableOpacity
+                      key={amt}
+                      style={[s.quickBtn, { borderColor: PRIMARY }]}
+                      onPress={() => updateRow(0, 'amount', String(amt))}
+                    >
+                      <Text style={[s.quickBtnText, { color: PRIMARY }]}>+{amt >= 1000 ? `${amt / 1000}k` : amt}</Text>
+                    </TouchableOpacity>
+                  ))}
+                  <TouchableOpacity
+                    style={[s.quickBtn, { borderColor: PRIMARY, backgroundColor: PRIMARY + '18' }]}
+                    onPress={() => updateRow(0, 'amount', String(Math.round(grandTotal)))}
+                  >
+                    <Text style={[s.quickBtnText, { color: PRIMARY }]}>Exacto</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            )}
+
+            {/* Resumen de cobro */}
+            {totalPaid > 0 && (
+              <View style={[s.changeBox, remaining <= 0.01 ? s.changePos : s.changeNeg]}>
+                <Text style={s.changeLabel}>
+                  {remaining <= 0.01 ? (remaining < -0.01 ? 'Cambio a devolver' : 'Exacto') : 'Falta por cubrir'}
+                </Text>
+                <Text style={s.changeValue}>
+                  {remaining < -0.01 ? formatCurrency(Math.abs(remaining), sign) : remaining > 0.01 ? formatCurrency(remaining, sign) : '—'}
+                </Text>
+              </View>
+            )}
+
+            {/* Nombre + Observaciones — solo para crédito/fiado */}
             {isCredit && (
               <>
-                <TextInput
-                  style={[s.amountInput, { borderColor: c.border, backgroundColor: c.surfaceAlt, color: c.text }]}
-                  value={customerName}
-                  onChangeText={setCustomerName}
-                  placeholder="Nombre del cliente"
-                  placeholderTextColor={c.textMuted}
-                />
-                <TextInput
-                  style={[s.amountInput, { borderColor: c.border, backgroundColor: c.surfaceAlt, color: c.text }]}
-                  value={paymentNotes}
-                  onChangeText={setPaymentNotes}
-                  placeholder="Observaciones del fiado"
-                  placeholderTextColor={c.textMuted}
-                />
+                <View style={{ gap: 8 }}>
+                  <Text style={s.payLabel}>Nombre del cliente *</Text>
+                  <TextInput
+                    style={s.payInput}
+                    placeholder="Nombre completo de quien debe"
+                    placeholderTextColor={c.textMuted}
+                    value={customerName}
+                    onChangeText={setCustomerName}
+                    autoCapitalize="words"
+                  />
+                </View>
+                <View style={{ gap: 8 }}>
+                  <Text style={s.payLabel}>Observaciones *</Text>
+                  <TextInput
+                    style={[s.payInput, { minHeight: 70, textAlignVertical: 'top' }]}
+                    placeholder="Motivo, plazo de pago, referencia..."
+                    placeholderTextColor={c.textMuted}
+                    value={paymentNotes}
+                    onChangeText={setPaymentNotes}
+                    multiline
+                  />
+                </View>
               </>
             )}
 
-            {!isCredit && (
-              <TouchableOpacity onPress={addRow} style={[s.addRowBtn, { borderColor: PRIMARY }]}>
-                <Ionicons name="add" size={16} color={PRIMARY} />
-                <Text style={[s.addRowBtnText, { color: PRIMARY }]}>Dividir pago</Text>
-              </TouchableOpacity>
-            )}
-          </ScrollView>
-
-          <View style={s.detailFooter}>
             <TouchableOpacity
-              style={[s.advBtn, { backgroundColor: '#059669' }, loading && s.btnDisabled]}
+              style={[
+                s.confirmBtn,
+                { backgroundColor: isCredit ? '#d97706' : PRIMARY },
+                (loading || (isCredit && (!customerName.trim() || !paymentNotes.trim()))) && s.btnDisabled,
+              ]}
               onPress={confirm}
-              disabled={loading}
+              disabled={loading || (isCredit && (!customerName.trim() || !paymentNotes.trim()))}
             >
               {loading
-                ? <ActivityIndicator color="#fff" />
-                : <>
-                    <Ionicons name="checkmark-circle-outline" size={18} color="#fff" />
-                    <Text style={s.advBtnText}>{isCredit ? 'Guardar fiado' : `Cobrar ${formatCurrency(orderTotal, sign)}`}</Text>
-                  </>
-              }
+                ? <ActivityIndicator color={c.textInverse} />
+                : <Text style={s.confirmBtnText}>{isCredit ? 'Registrar fiado' : 'Confirmar cobro'}</Text>}
             </TouchableOpacity>
-          </View>
+          </ScrollView>
         </KeyboardAvoidingView>
       </SafeAreaView>
     </Modal>
@@ -285,28 +306,54 @@ function PayModal({ order, onClose, onRefresh }: {
 
 function makePayStyles(c: ReturnType<typeof useAppColors>) {
   return StyleSheet.create({
-    detailRoot:   { flex: 1, backgroundColor: c.surface },
-    detailHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: c.border },
+    detailRoot: { flex: 1, backgroundColor: c.surface },
+    detailHeader: {
+      flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+      paddingHorizontal: 20, paddingVertical: 16,
+      borderBottomWidth: 1, borderBottomColor: c.border,
+    },
     detailTitle:  { fontSize: 18, fontWeight: '700', color: c.text },
-    detailFooter: { padding: 16, borderTopWidth: 1, borderTopColor: c.border },
-    advBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: 12, padding: 14 },
-    advBtnText: { color: '#fff', fontWeight: '700', fontSize: 15 },
-    btnDisabled: { opacity: 0.5 },
+    btnDisabled:  { opacity: 0.5 },
 
-    payTotal:   { borderWidth: 1, borderRadius: 12, padding: 14 },
+    payTotal: {
+      borderWidth: 2, borderRadius: 12, padding: 16,
+      flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    },
     payTotalLabel: { fontSize: 14, fontWeight: '600', color: c.textSecondary },
-
-    payRow:        { gap: 10 },
-    methodSelect:  { borderRadius: 10, borderWidth: 1, overflow: 'hidden' },
-    methodChip:    { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 8, backgroundColor: 'transparent' },
-    methodChipText:{ fontSize: 13, fontWeight: '600' },
-    amountRow:     { flexDirection: 'row', alignItems: 'center', gap: 8 },
-    amountInput:   { flex: 1, borderWidth: 1, borderRadius: 10, padding: 12, fontSize: 18, fontWeight: '700' },
-    removeRowBtn:  { padding: 4 },
-    quickBtn:      { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 8, borderWidth: 1 },
-    quickBtnText:  { fontSize: 12, fontWeight: '600' },
-    addRowBtn:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, borderWidth: 1, borderRadius: 10, padding: 10, borderStyle: 'dashed' },
-    addRowBtnText: { fontSize: 14, fontWeight: '600' },
+    payTotalValue: { fontSize: 24, fontWeight: '800' },
+    payLabel:      { fontSize: 13, fontWeight: '600', color: c.textSecondary },
+    payInput: {
+      borderWidth: 1, borderColor: c.border, borderRadius: 10,
+      padding: 12, fontSize: 16, backgroundColor: c.surfaceAlt, color: c.text,
+    },
+    payRow: {
+      backgroundColor: c.surfaceAlt, borderRadius: 10, padding: 12,
+      borderWidth: 1, borderColor: c.border,
+    },
+    removePayBtn: { padding: 6 },
+    addPayBtn: {
+      flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
+      borderWidth: 1, borderStyle: 'dashed', borderRadius: 10, paddingVertical: 10,
+    },
+    addPayBtnText: { fontSize: 13, fontWeight: '600' },
+    methodChip: {
+      paddingHorizontal: 14, paddingVertical: 8, borderRadius: 8,
+      borderWidth: 1, borderColor: c.border, backgroundColor: c.surface,
+    },
+    methodChipText:{ fontSize: 13, fontWeight: '600', color: c.textSecondary },
+    changeBox: {
+      borderRadius: 10, padding: 12,
+      flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    },
+    changePos:   { backgroundColor: c.successLight },
+    changeNeg:   { backgroundColor: c.dangerLight },
+    changeLabel: { fontSize: 13, fontWeight: '600', color: c.textSecondary },
+    changeValue: { fontSize: 18, fontWeight: '800', color: c.text },
+    quickRow:    { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+    quickBtn:    { borderWidth: 1.5, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8 },
+    quickBtnText:{ fontSize: 13, fontWeight: '700' },
+    confirmBtn:  { borderRadius: 12, padding: 16, alignItems: 'center', marginTop: 8 },
+    confirmBtnText: { color: '#fff', fontWeight: '700', fontSize: 15 },
   })
 }
 
