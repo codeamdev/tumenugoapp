@@ -256,29 +256,128 @@ function KpiCard({ label, value, icon, color }: {
   )
 }
 
-// ─── Fila historial ───────────────────────────────────────────────────────────
+// ─── Modal: Detalle de cierre ─────────────────────────────────────────────────
 
-function HistoryRow({ reg, sign }: { reg: CashRegister; sign: string }) {
+function CierreDetailModal({ reg, sign, labels, onClose }: {
+  reg: CashRegister; sign: string; labels: Record<string, string>; onClose: () => void
+}) {
   const c = useAppColors()
   const styles = makeStyles(c)
   const diff = parseFloat(reg.difference ?? '0')
+  const opening = parseFloat(reg.openingAmount ?? '0')
+  const byMethod = reg.countedByMethod ?? {}
+  const methodKeys = Object.keys(byMethod)
+
   return (
-    <View style={styles.histRow}>
-      <View style={{ flex: 1 }}>
-        <Text style={styles.histDate}>{reg.closedAt ? formatDateTime(reg.closedAt) : '—'}</Text>
-        <Text style={styles.histSub}>
-          Apertura {formatCurrency(parseFloat(reg.openingAmount ?? '0'), sign)}
-        </Text>
-      </View>
-      <View style={{ alignItems: 'flex-end' }}>
-        <Text style={styles.histExpected}>{formatCurrency(parseFloat(reg.countedCash ?? '0'), sign)}</Text>
-        {reg.difference !== null && (
-          <Text style={[styles.histDiff, diff >= 0 ? styles.diffPosText : styles.diffNegText]}>
-            {diff >= 0 ? '+' : ''}{formatCurrency(diff, sign)}
+    <Modal visible animationType="slide" presentationStyle="formSheet" onRequestClose={onClose}>
+      <SafeAreaView style={styles.modalRoot}>
+        <View style={styles.modalHeader}>
+          <Text style={styles.modalTitle}>Detalle del cierre</Text>
+          <TouchableOpacity onPress={onClose}>
+            <Ionicons name="close" size={24} color={c.textSecondary} />
+          </TouchableOpacity>
+        </View>
+        <ScrollView contentContainerStyle={styles.modalBody}>
+          {/* Fecha */}
+          <Text style={[styles.label, { marginBottom: 2 }]}>Fecha de cierre</Text>
+          <Text style={[styles.infoValue, { marginBottom: 12 }]}>
+            {reg.closedAt ? formatDateTime(reg.closedAt) : '—'}
           </Text>
-        )}
-      </View>
-    </View>
+
+          {/* Base */}
+          <View style={[styles.infoRow, { marginBottom: 12 }]}>
+            <Text style={styles.infoLabel}>Base / Apertura</Text>
+            <Text style={styles.infoValue}>
+              {opening > 0 ? formatCurrency(opening, sign) : 'Sin base'}
+            </Text>
+          </View>
+
+          {/* Por método */}
+          {methodKeys.length > 0 && (
+            <View style={[styles.summaryBox, { borderColor: c.border }]}>
+              <Text style={[styles.summaryTitle, { color: c.textMuted }]}>Contado por método</Text>
+              {methodKeys.map((m) => (
+                <View key={m} style={styles.summaryRow}>
+                  <Text style={[styles.summaryLabel, { color: c.textSecondary }]}>{labels[m] ?? m}</Text>
+                  <Text style={[styles.summaryValue, { color: c.text, fontWeight: '700' }]}>
+                    {formatCurrency(byMethod[m] ?? 0, sign)}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          )}
+
+          {/* Esperado vs Contado */}
+          <View style={[styles.infoRow, { marginBottom: 4 }]}>
+            <Text style={styles.infoLabel}>Esperado efectivo</Text>
+            <Text style={styles.infoValue}>{formatCurrency(parseFloat(reg.expectedCash ?? '0'), sign)}</Text>
+          </View>
+          {opening > 0 && (
+            <Text style={[styles.label, { color: c.textMuted, fontSize: 11, marginBottom: 8 }]}>
+              Base de {formatCurrency(opening, sign)} no incluida en el conteo
+            </Text>
+          )}
+          <View style={[styles.infoRow, { marginBottom: 12 }]}>
+            <Text style={styles.infoLabel}>Contado efectivo</Text>
+            <Text style={styles.infoValue}>{formatCurrency(parseFloat(reg.countedCash ?? '0'), sign)}</Text>
+          </View>
+
+          {/* Diferencia */}
+          {reg.difference !== null && (
+            <View style={[styles.diffBox, diff >= 0 ? styles.diffPos : styles.diffNeg]}>
+              <Text style={styles.diffLabel}>{diff === 0 ? 'Exacto' : diff > 0 ? 'Sobrante' : 'Faltante'}</Text>
+              <Text style={styles.diffValue}>
+                {diff > 0 ? '+' : ''}{formatCurrency(diff, sign)}
+              </Text>
+            </View>
+          )}
+
+          {/* Notas */}
+          {!!reg.notes && (
+            <View style={{ marginTop: 12 }}>
+              <Text style={[styles.label, { marginBottom: 4 }]}>Observaciones</Text>
+              <Text style={{ color: c.textSecondary, fontSize: 14 }}>{reg.notes}</Text>
+            </View>
+          )}
+        </ScrollView>
+      </SafeAreaView>
+    </Modal>
+  )
+}
+
+// ─── Fila historial ───────────────────────────────────────────────────────────
+
+function HistoryRow({ reg, sign, labels }: { reg: CashRegister; sign: string; labels: Record<string, string> }) {
+  const c = useAppColors()
+  const styles = makeStyles(c)
+  const [detail, setDetail] = useState(false)
+  const diff = parseFloat(reg.difference ?? '0')
+  const opening = parseFloat(reg.openingAmount ?? '0')
+  return (
+    <>
+      <TouchableOpacity style={styles.histRow} onPress={() => setDetail(true)} activeOpacity={0.7}>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.histDate}>{reg.closedAt ? formatDateTime(reg.closedAt) : '—'}</Text>
+          <Text style={styles.histSub}>
+            {opening > 0
+              ? `Base ${formatCurrency(opening, sign)}`
+              : 'Sin base'}
+          </Text>
+        </View>
+        <View style={{ alignItems: 'flex-end' }}>
+          <Text style={styles.histExpected}>{formatCurrency(parseFloat(reg.countedCash ?? '0'), sign)}</Text>
+          {reg.difference !== null && (
+            <Text style={[styles.histDiff, diff >= 0 ? styles.diffPosText : styles.diffNegText]}>
+              {diff === 0 ? 'Exacto' : (diff > 0 ? '+' : '') + formatCurrency(diff, sign)}
+            </Text>
+          )}
+        </View>
+        <Ionicons name="chevron-forward" size={16} color={c.textMuted} style={{ marginLeft: 6 }} />
+      </TouchableOpacity>
+      {detail && (
+        <CierreDetailModal reg={reg} sign={sign} labels={labels} onClose={() => setDetail(false)} />
+      )}
+    </>
   )
 }
 
@@ -395,7 +494,7 @@ export default function CajaScreen() {
         {history.length > 0 && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Historial reciente</Text>
-            {history.map((h) => <HistoryRow key={h.id} reg={h} sign={sign} />)}
+            {history.map((h) => <HistoryRow key={h.id} reg={h} sign={sign} labels={labels} />)}
           </View>
         )}
 
