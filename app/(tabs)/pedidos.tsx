@@ -357,6 +357,146 @@ function makePayStyles(c: ReturnType<typeof useAppColors>) {
   })
 }
 
+// ─── Modal: Editar forma de pago ─────────────────────────────────────────────
+
+function EditPayModal({ order, onClose, onRefresh }: {
+  order: Order
+  onClose: () => void
+  onRefresh: () => void
+}) {
+  const c = useAppColors()
+  const s = makePayStyles(c)
+  const { tenant, config } = useAuthStore()
+  const PRIMARY = tenant?.primaryColor ?? '#2563eb'
+  const sign    = tenant?.currencySign ?? '$'
+  const methods = config?.paymentMethods ?? [{ key: 'cash', label: 'Efectivo' }]
+  const orderTotal = parseFloat(order.total)
+
+  const [payments, setPayments] = useState<PaymentRow[]>([
+    { method: order.paymentMethod ?? methods[0]?.key ?? 'cash', amount: String(Math.round(orderTotal)) },
+  ])
+  const [paymentNotes, setPaymentNotes] = useState(order.paymentNotes ?? '')
+  const [loading, setLoading] = useState(false)
+
+  function fmtNum(raw: string) {
+    const n = raw.replace(/\D/g, '')
+    return n ? parseInt(n, 10).toLocaleString('es-CO') : ''
+  }
+
+  function updateRow(idx: number, field: keyof PaymentRow, value: string) {
+    const stored = field === 'amount' ? value.replace(/\D/g, '') : value
+    setPayments((prev) => prev.map((p, i) => i === idx ? { ...p, [field]: stored } : p))
+  }
+
+  function addRow() {
+    setPayments((prev) => [...prev, { method: methods[0]?.key ?? 'cash', amount: '' }])
+  }
+
+  function removeRow(idx: number) {
+    setPayments((prev) => prev.filter((_, i) => i !== idx))
+  }
+
+  async function save() {
+    const validPayments = payments
+      .map((p) => ({ method: p.method, amount: parseFloat(p.amount) || 0 }))
+      .filter((p) => p.amount > 0)
+    if (validPayments.length === 0) {
+      Alert.alert('Sin monto', 'Ingresa al menos un monto.')
+      return
+    }
+    setLoading(true)
+    try {
+      await api.patch(`/api/tenant/orders/${order.id}`, {
+        action: 'update_payment',
+        payments: validPayments,
+        paymentNotes: paymentNotes.trim() || undefined,
+      })
+      onRefresh()
+      onClose()
+    } catch (err: any) {
+      Alert.alert('Error', err.message)
+    } finally { setLoading(false) }
+  }
+
+  return (
+    <Modal visible animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
+      <SafeAreaView style={s.detailRoot}>
+        <View style={s.detailHeader}>
+          <Text style={s.detailTitle}>Editar forma de pago</Text>
+          <TouchableOpacity onPress={onClose}>
+            <Ionicons name="close" size={24} color={c.textSecondary} />
+          </TouchableOpacity>
+        </View>
+        <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+          <ScrollView contentContainerStyle={{ padding: 20, gap: 16 }}>
+            <View style={[s.payTotal, { borderColor: PRIMARY + '40' }]}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                <Text style={[s.payTotalLabel, { fontWeight: '700' }]}>Total del pedido</Text>
+                <Text style={[s.payTotalValue, { color: PRIMARY }]}>{formatCurrency(orderTotal, sign)}</Text>
+              </View>
+            </View>
+            <View style={{ gap: 8 }}>
+              <Text style={s.payLabel}>Forma(s) de pago</Text>
+              {payments.map((row, idx) => (
+                <View key={idx} style={s.payRow}>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ maxHeight: 38 }} contentContainerStyle={{ gap: 6, paddingRight: 4 }}>
+                    {methods.map((m) => (
+                      <TouchableOpacity
+                        key={m.key}
+                        style={[s.methodChip, row.method === m.key && { backgroundColor: PRIMARY, borderColor: PRIMARY }]}
+                        onPress={() => updateRow(idx, 'method', m.key)}
+                      >
+                        <Text style={[s.methodChipText, row.method === m.key && { color: c.textInverse }]}>{m.label}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </ScrollView>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8 }}>
+                    <TextInput
+                      style={[s.payInput, { flex: 1 }]}
+                      keyboardType="numeric"
+                      placeholder={`Monto (${sign})`}
+                      placeholderTextColor={c.textMuted}
+                      value={fmtNum(row.amount)}
+                      onChangeText={(v) => updateRow(idx, 'amount', v)}
+                    />
+                    {payments.length > 1 && (
+                      <TouchableOpacity onPress={() => removeRow(idx)} style={s.removePayBtn}>
+                        <Ionicons name="trash-outline" size={18} color={c.danger} />
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                </View>
+              ))}
+              <TouchableOpacity style={[s.addPayBtn, { borderColor: PRIMARY }]} onPress={addRow}>
+                <Ionicons name="add-circle-outline" size={16} color={PRIMARY} />
+                <Text style={[s.addPayBtnText, { color: PRIMARY }]}>Agregar método</Text>
+              </TouchableOpacity>
+            </View>
+            <View style={{ gap: 8 }}>
+              <Text style={s.payLabel}>Observaciones</Text>
+              <TextInput
+                style={[s.payInput, { minHeight: 64 }]}
+                placeholder="Ej: cambio pendiente, referencia..."
+                placeholderTextColor={c.textMuted}
+                value={paymentNotes}
+                onChangeText={setPaymentNotes}
+                multiline
+              />
+            </View>
+            <TouchableOpacity
+              style={[s.confirmBtn, { backgroundColor: PRIMARY }, loading && { opacity: 0.6 }]}
+              onPress={save}
+              disabled={loading}
+            >
+              <Text style={s.confirmBtnText}>{loading ? 'Guardando...' : 'Guardar cambios'}</Text>
+            </TouchableOpacity>
+          </ScrollView>
+        </KeyboardAvoidingView>
+      </SafeAreaView>
+    </Modal>
+  )
+}
+
 // ─── OrderCard (acordeón) ─────────────────────────────────────────────────────
 
 function OrderCard({ listOrder, expanded, onToggle, onRefresh, readOnly }: {
@@ -368,17 +508,19 @@ function OrderCard({ listOrder, expanded, onToggle, onRefresh, readOnly }: {
 }) {
   const c = useAppColors()
   const s = makeCardStyles(c)
-  const { tenant, user } = useAuthStore()
+  const { tenant, user, config } = useAuthStore()
   const qc = useQueryClient()
   const { isConnected } = useNetworkStatus()
   const PRIMARY = tenant?.primaryColor ?? '#2563eb'
   const sign    = tenant?.currencySign ?? '$'
   const isAdmin = user?.role === 'admin'
+  const payMethods = config?.paymentMethods ?? []
 
   const [order, setOrder]           = useState<Order>(listOrder)
   const [loadingFull, setLoadingFull] = useState(false)
   const [actionLoading, setActionLoading] = useState(false)
   const [payOpen, setPayOpen]       = useState(false)
+  const [editPayOpen, setEditPayOpen] = useState(false)
   const [addOpen, setAddOpen]       = useState(false)
   const [cancellingItem, setCancellingItem] = useState<string | null>(null)
   const [notesDraft, setNotesDraft] = useState(listOrder.notes ?? '')
@@ -429,6 +571,7 @@ function OrderCard({ listOrder, expanded, onToggle, onRefresh, readOnly }: {
   const canAdvance   = !readOnly && ['new', 'sent', 'preparing', 'ready'].includes(order.status)
   const canCancelItem = !readOnly && !['closed', 'cancelled'].includes(order.status)
   const canAddItems  = !readOnly && !['closed', 'cancelled'].includes(order.status)
+  const canEditPay   = readOnly && order.status === 'closed' && isAdmin
 
   const ADVANCE_LABELS: Partial<Record<string, string>> = {
     new: 'Enviar a cocina', sent: 'Marcar preparando', preparing: 'Marcar listo', ready: 'Marcar entregado',
@@ -557,6 +700,11 @@ function OrderCard({ listOrder, expanded, onToggle, onRefresh, readOnly }: {
           <View style={[s.badge, { backgroundColor: color + '22' }]}>
             <Text style={[s.badgeText, { color }]}>{label}</Text>
           </View>
+          {readOnly && order.paymentMethod && (
+            <Text style={{ fontSize: 11, color: c.textMuted }}>
+              {payMethods.find((m) => m.key === order.paymentMethod)?.label ?? order.paymentMethod}
+            </Text>
+          )}
         </View>
         <Ionicons name={expanded ? 'chevron-up' : 'chevron-down'} size={18} color={c.textMuted} style={{ alignSelf: 'center' }} />
       </TouchableOpacity>
@@ -575,6 +723,12 @@ function OrderCard({ listOrder, expanded, onToggle, onRefresh, readOnly }: {
                   {order.customerPhone  && <Text style={s.meta}>Tel: {order.customerPhone}</Text>}
                   {order.customerAddress && <Text style={s.meta}>Dirección: {order.customerAddress}</Text>}
                   {order.customerNotes  && <Text style={s.meta}>Nota cliente: {order.customerNotes}</Text>}
+                  {readOnly && order.paymentMethod && (
+                    <Text style={s.meta}>
+                      Pago: {payMethods.find((m) => m.key === order.paymentMethod)?.label ?? order.paymentMethod}
+                      {order.paymentNotes ? ` · ${order.paymentNotes}` : ''}
+                    </Text>
+                  )}
 
                   {/* Nota del pedido — editable */}
                   {canEditNotes ? (
@@ -712,6 +866,16 @@ function OrderCard({ listOrder, expanded, onToggle, onRefresh, readOnly }: {
                       <Text style={s.deleteActionBtnText}>Eliminar pedido</Text>
                     </TouchableOpacity>
                   )}
+                  {canEditPay && (
+                    <TouchableOpacity
+                      style={[s.actionBtn, { backgroundColor: '#7c3aed' }, actionLoading && s.btnDisabled]}
+                      onPress={() => setEditPayOpen(true)}
+                      disabled={actionLoading}
+                    >
+                      <Ionicons name="create-outline" size={16} color="#fff" />
+                      <Text style={s.actionBtnText}>Editar pago</Text>
+                    </TouchableOpacity>
+                  )}
                 </View>
               </>
             )
@@ -725,6 +889,13 @@ function OrderCard({ listOrder, expanded, onToggle, onRefresh, readOnly }: {
           order={order}
           onClose={() => setPayOpen(false)}
           onRefresh={() => { refreshOrder(); onToggle() }}
+        />
+      )}
+      {editPayOpen && (
+        <EditPayModal
+          order={order}
+          onClose={() => setEditPayOpen(false)}
+          onRefresh={refreshOrder}
         />
       )}
       {addOpen && (
