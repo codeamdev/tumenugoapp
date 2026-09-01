@@ -832,6 +832,8 @@ export default function PedidosScreen() {
   const [activeTab, setActiveTab] = useState<OrderStatus | 'all'>('all')
   const [histTab, setHistTab]   = useState<'all' | 'cancelled'>('all')
   const [expandedId, setExpandedId] = useState<string | null>(null)
+  const [hFilterMethod, setHFilterMethod] = useState<string | null>(null)
+  const [hFilterType,   setHFilterType]   = useState<string | null>(null)
 
   const activeQuery = useQuery({
     queryKey: ['orders', 'active'],
@@ -885,9 +887,16 @@ export default function PedidosScreen() {
   const completedOrders = historialOrders.filter((o) => o.status !== 'cancelled')
   const cancelledOrders = historialOrders.filter((o) => o.status === 'cancelled')
 
+  const histBase = histTab === 'all' ? completedOrders : cancelledOrders
+  const filteredHist = histBase.filter((o) => {
+    if (hFilterMethod && o.paymentMethod !== hFilterMethod) return false
+    if (hFilterType && o.type !== hFilterType) return false
+    return true
+  })
+
   const filtered = mode === 'active'
     ? (activeTab === 'all' ? activeOrders : activeOrders.filter((o) => o.status === activeTab))
-    : (histTab === 'all' ? completedOrders : cancelledOrders)
+    : filteredHist
 
   const refresh = useCallback(() => {
     if (mode === 'active') {
@@ -902,8 +911,9 @@ export default function PedidosScreen() {
     setExpandedId((prev) => (prev === id ? null : id))
   }
 
-  // Collapse when switching modes/tabs
+  // Collapse when switching modes/tabs; reset historial filters when leaving historial
   useEffect(() => { setExpandedId(null) }, [mode, activeTab, histTab])
+  useEffect(() => { if (mode !== 'historial') { setHFilterMethod(null); setHFilterType(null) } }, [mode])
 
   const tabs    = mode === 'active' ? ACTIVE_TABS : HIST_TABS
   const currTab = mode === 'active' ? activeTab : histTab
@@ -952,6 +962,51 @@ export default function PedidosScreen() {
           )
         })}
       </ScrollView>
+
+      {/* Filtros historial */}
+      {mode === 'historial' && (
+        <ScrollView
+          horizontal showsHorizontalScrollIndicator={false}
+          style={{ borderBottomWidth: 1, borderBottomColor: c.border }}
+          contentContainerStyle={{ flexDirection: 'row', gap: 6, paddingHorizontal: 12, paddingVertical: 8 }}
+        >
+          {[
+            { label: 'Efectivo', value: 'cash', group: 'method' },
+            { label: 'Nequi', value: 'nequi', group: 'method' },
+            { label: 'Tarjeta', value: 'card', group: 'method' },
+            { label: 'Transf.', value: 'transfer', group: 'method' },
+          ].map((f) => {
+            const active = hFilterMethod === f.value
+            return (
+              <TouchableOpacity
+                key={f.value}
+                onPress={() => setHFilterMethod(active ? null : f.value)}
+                style={[s.filterChip, active && { backgroundColor: PRIMARY, borderColor: PRIMARY }]}
+              >
+                <Text style={[s.filterChipText, active && { color: c.textInverse }]}>{f.label}</Text>
+              </TouchableOpacity>
+            )
+          })}
+          <View style={{ width: 1, backgroundColor: c.border, marginHorizontal: 2 }} />
+          {[
+            { label: 'Mesa', value: 'table' },
+            { label: 'Barra', value: 'bar' },
+            { label: 'Domicilio', value: 'delivery' },
+            { label: 'Para llevar', value: 'takeout' },
+          ].map((f) => {
+            const active = hFilterType === f.value
+            return (
+              <TouchableOpacity
+                key={f.value}
+                onPress={() => setHFilterType(active ? null : f.value)}
+                style={[s.filterChip, active && { backgroundColor: PRIMARY, borderColor: PRIMARY }]}
+              >
+                <Text style={[s.filterChipText, active && { color: c.textInverse }]}>{f.label}</Text>
+              </TouchableOpacity>
+            )
+          })}
+        </ScrollView>
+      )}
 
       {isLoading
         ? <View style={s.centered}><ActivityIndicator size="large" color={PRIMARY} /></View>
@@ -1007,6 +1062,12 @@ function makePedidosStyles(c: ReturnType<typeof useAppColors>) {
 
     tabBar:    { backgroundColor: c.surface, borderBottomWidth: 1, borderBottomColor: c.border, flexShrink: 0 },
     tabContent:{ paddingHorizontal: 12, paddingVertical: 10, gap: 6, flexDirection: 'row', alignItems: 'center' },
+
+    filterChip: {
+      paddingHorizontal: 10, paddingVertical: 5, borderRadius: 16,
+      borderWidth: 1.5, borderColor: c.border, backgroundColor: c.surface,
+    },
+    filterChipText: { fontSize: 12, fontWeight: '600', color: c.textSecondary },
     tab:       { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, backgroundColor: c.surfaceAlt },
     tabText:   { fontSize: 13, color: c.textMuted, fontWeight: '600' },
   })
