@@ -1,6 +1,6 @@
 import {
   View, Text, FlatList, TouchableOpacity, StyleSheet,
-  Alert, ActivityIndicator, RefreshControl, Animated, Vibration,
+  Alert, ActivityIndicator, RefreshControl, Vibration,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
@@ -28,38 +28,12 @@ function KitchenCard({ order, onUpdate, alertMinutes }: { order: Order; onUpdate
   const PRIMARY = tenant?.primaryColor ?? '#2563eb'
   const isSent      = order.status === 'sent'
   const isPreparing = order.status === 'preparing'
-  const isReady     = order.status === 'ready'
 
   const timeRef = order.createdAt
   const elapsedMin = timeRef
     ? Math.floor((Date.now() - new Date(timeRef).getTime()) / 60_000)
     : null
 
-  const isUrgent = elapsedMin !== null && elapsedMin >= 15
-  const isLate   = (isSent || isPreparing) && alertMinutes > 0 && elapsedMin !== null && elapsedMin >= alertMinutes
-
-  const blinkAnim = useRef(new Animated.Value(1)).current
-  useEffect(() => {
-    if (!isLate) { blinkAnim.setValue(1); return }
-    const loop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(blinkAnim, { toValue: 0,  duration: 400, useNativeDriver: true }),
-        Animated.timing(blinkAnim, { toValue: 1,  duration: 400, useNativeDriver: true }),
-      ])
-    )
-    loop.start()
-    return () => loop.stop()
-  }, [isLate])
-
-  const wasLate = useRef(false)
-  useEffect(() => {
-    if (isLate && !wasLate.current) {
-      playBeep()
-      Vibration.vibrate([0, 300, 200, 300])
-      wasLate.current = true
-    }
-    if (!isLate) wasLate.current = false
-  }, [isLate])
 
   type KitchenData = { orders: Order[]; alertMinutes: number }
 
@@ -107,13 +81,7 @@ function KitchenCard({ order, onUpdate, alertMinutes }: { order: Order; onUpdate
   }
 
   return (
-    <Animated.View style={[styles.card, isPreparing && styles.cardPreparing, isUrgent && styles.cardUrgent, isLate && styles.cardLate, { opacity: isLate ? blinkAnim : 1 }]}>
-      {/* Cabecera */}
-      {isLate && (
-        <View style={styles.lateBar}>
-          <Text style={styles.lateText}>⚠ DEMORADO — {elapsedMin} min en preparación</Text>
-        </View>
-      )}
+    <View style={[styles.card, isPreparing && styles.cardPreparing]}>
       <View style={styles.cardTop}>
         <View>
           <Text style={styles.cardId}>{order.displayCode ?? '#' + order.id.slice(-6).toUpperCase()}</Text>
@@ -127,9 +95,7 @@ function KitchenCard({ order, onUpdate, alertMinutes }: { order: Order; onUpdate
         <View style={{ alignItems: 'flex-end' }}>
           <View style={[styles.dot, isSent ? styles.dotSent : styles.dotPreparing]} />
           {elapsedMin !== null && (
-            <Text style={[styles.elapsed, isUrgent && styles.elapsedUrgent]}>
-              {elapsedMin} min
-            </Text>
+            <Text style={styles.elapsed}>{elapsedMin} min</Text>
           )}
         </View>
       </View>
@@ -176,14 +142,8 @@ function KitchenCard({ order, onUpdate, alertMinutes }: { order: Order; onUpdate
             <Text style={styles.actionBtnText}>Listo</Text>
           </TouchableOpacity>
         )}
-        {isReady && (
-          <TouchableOpacity style={[styles.actionBtn, styles.btnDelivered]} onPress={() => advance('delivered')}>
-            <Ionicons name="bicycle-outline" size={16} color="#fff" />
-            <Text style={styles.actionBtnText}>Entregado</Text>
-          </TouchableOpacity>
-        )}
       </View>
-    </Animated.View>
+    </View>
   )
 }
 
@@ -191,7 +151,7 @@ function KitchenCard({ order, onUpdate, alertMinutes }: { order: Order; onUpdate
 
 export default function CocinaScreen() {
   const qc = useQueryClient()
-  const { tenant, config } = useAuthStore()
+  const { tenant, config, user } = useAuthStore()
   const c = useAppColors()
   const styles = makeStyles(c)
   const PRIMARY = tenant?.primaryColor ?? '#2563eb'
@@ -232,7 +192,7 @@ export default function CocinaScreen() {
   useEffect(() => {
     if (!data) return
     const currentIds = new Set(orders.map((o) => o.id))
-    if (initialLoadDone.current && [...currentIds].some((id) => !knownOrderIds.current.has(id))) {
+    if (user?.role === 'cocina' && initialLoadDone.current && [...currentIds].some((id) => !knownOrderIds.current.has(id))) {
       playBeep()
       Vibration.vibrate([0, 200, 100, 200])
     }
@@ -316,13 +276,6 @@ function makeStyles(c: ReturnType<typeof useAppColors>) {
       borderLeftWidth: 4, borderLeftColor: '#2563eb',
     },
     cardPreparing: { borderLeftColor: '#ea580c' },
-    cardUrgent: { borderLeftColor: '#ef4444' },
-    cardLate:   { borderLeftColor: '#ef4444', borderWidth: 2, borderColor: '#ef4444' },
-    lateBar: {
-      backgroundColor: '#fef2f2', borderRadius: 6, paddingHorizontal: 10, paddingVertical: 5,
-      marginBottom: 10, flexDirection: 'row', alignItems: 'center',
-    },
-    lateText: { fontSize: 12, fontWeight: '700', color: '#dc2626', flex: 1 },
 
     cardTop: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 },
     cardId:    { fontSize: 18, fontWeight: '800', color: c.text },
@@ -330,7 +283,6 @@ function makeStyles(c: ReturnType<typeof useAppColors>) {
     cardSub:   { fontSize: 13, color: c.textMuted, marginTop: 2 },
     cardTime: { fontSize: 11, color: c.textMuted, marginTop: 2 },
     elapsed: { fontSize: 13, fontWeight: '600', color: c.textMuted, marginTop: 2 },
-    elapsedUrgent: { color: '#ef4444' },
 
     dot: { width: 10, height: 10, borderRadius: 5 },
     dotSent:      { backgroundColor: '#2563eb' },

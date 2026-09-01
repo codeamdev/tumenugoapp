@@ -1,8 +1,8 @@
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import {
   View, Text, FlatList, TouchableOpacity, StyleSheet,
   Modal, ScrollView, Alert, ActivityIndicator,
-  RefreshControl, TextInput, KeyboardAvoidingView, Platform,
+  RefreshControl, TextInput, KeyboardAvoidingView, Platform, Vibration,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
@@ -825,7 +825,7 @@ export default function PedidosScreen() {
   const c = useAppColors()
   const s = makePedidosStyles(c)
   const qc = useQueryClient()
-  const { tenant } = useAuthStore()
+  const { tenant, user } = useAuthStore()
   const PRIMARY = tenant?.primaryColor ?? '#2563eb'
 
   const [mode, setMode]         = useState<'active' | 'historial'>('active')
@@ -867,6 +867,20 @@ export default function PedidosScreen() {
   const isError      = mode === 'active' ? activeQuery.isError : historialQuery.isError
   const isRefetching = mode === 'active' ? activeQuery.isRefetching : historialQuery.isRefetching
   const refetch      = mode === 'active' ? activeQuery.refetch : historialQuery.refetch
+
+  // Notificar al mesero cuando un pedido pasa a "listo"
+  const knownReadyIds = useRef(new Set<string>())
+  const readyInitDone = useRef(false)
+  useEffect(() => {
+    if (!activeQuery.data) return
+    const currentReady = new Set(activeOrders.filter((o) => o.status === 'ready').map((o) => o.id))
+    if (readyInitDone.current && ['mesero', 'admin'].includes(user?.role ?? '')) {
+      const newReady = [...currentReady].filter((id) => !knownReadyIds.current.has(id))
+      if (newReady.length > 0) Vibration.vibrate([0, 300, 100, 300])
+    }
+    knownReadyIds.current = currentReady
+    readyInitDone.current = true
+  }, [activeQuery.data])
 
   const completedOrders = historialOrders.filter((o) => o.status !== 'cancelled')
   const cancelledOrders = historialOrders.filter((o) => o.status === 'cancelled')
