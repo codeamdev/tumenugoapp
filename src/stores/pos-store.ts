@@ -46,7 +46,7 @@ export const usePosStore = create<PosState>((set, get) => ({
   addItem: (item) =>
     set((s) => {
       const noMods = item.modifiers.length === 0
-      const existing = noMods
+      const existing = noMods && item.productId !== null
         ? s.items.find((i) =>
             i.productId === item.productId &&
             i.modifiers.length === 0 &&
