@@ -306,7 +306,7 @@ export default function ProductosScreen() {
       {/* ── Modal: Editar producto ── */}
       <Modal visible={showEditProd} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setShowEditProd(false)}>
         <SafeAreaView style={{ flex: 1, backgroundColor: c.background }}>
-          <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+          <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
             <View style={[s.modalHeader, { borderBottomColor: c.border }]}>
               <Text style={[s.modalTitle, { color: c.text }]}>Editar producto</Text>
               <TouchableOpacity onPress={() => setShowEditProd(false)}>
@@ -445,14 +445,14 @@ export default function ProductosScreen() {
       {/* ── Modal: Nueva categoría ── */}
       <Modal visible={showNewCat} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setShowNewCat(false)}>
         <SafeAreaView style={{ flex: 1, backgroundColor: c.background }}>
-          <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+          <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
             <View style={[s.modalHeader, { borderBottomColor: c.border }]}>
               <Text style={[s.modalTitle, { color: c.text }]}>Nueva categoría</Text>
               <TouchableOpacity onPress={() => setShowNewCat(false)}>
                 <Ionicons name="close" size={24} color={c.textSecondary} />
               </TouchableOpacity>
             </View>
-            <ScrollView contentContainerStyle={s.modalBody}>
+            <ScrollView contentContainerStyle={s.modalBody} keyboardShouldPersistTaps="handled">
               <Text style={[s.fieldLabel, { color: c.textSecondary }]}>Nombre *</Text>
               <TextInput
                 style={[s.fieldInput, { color: c.text, borderColor: c.border, backgroundColor: c.surfaceAlt }]}
@@ -487,14 +487,14 @@ export default function ProductosScreen() {
       {/* ── Modal: Nuevo producto ── */}
       <Modal visible={showNewProd} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setShowNewProd(false)}>
         <SafeAreaView style={{ flex: 1, backgroundColor: c.background }}>
-          <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+          <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
             <View style={[s.modalHeader, { borderBottomColor: c.border }]}>
               <Text style={[s.modalTitle, { color: c.text }]}>Nuevo producto</Text>
               <TouchableOpacity onPress={() => setShowNewProd(false)}>
                 <Ionicons name="close" size={24} color={c.textSecondary} />
               </TouchableOpacity>
             </View>
-            <ScrollView contentContainerStyle={s.modalBody}>
+            <ScrollView contentContainerStyle={s.modalBody} keyboardShouldPersistTaps="handled">
               <Text style={[s.fieldLabel, { color: c.textSecondary }]}>Nombre *</Text>
               <TextInput
                 style={[s.fieldInput, { color: c.text, borderColor: c.border, backgroundColor: c.surfaceAlt }]}

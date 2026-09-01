@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react'
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
   TextInput, Switch, Alert, ActivityIndicator,
+  KeyboardAvoidingView, Platform,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useRouter } from 'expo-router'
@@ -139,6 +140,7 @@ export default function ConfiguracionScreen() {
           <Text style={styles.offlineBannerText}>Sin conexión — mostrando última configuración guardada</Text>
         </View>
       )}
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
       <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
 
         {/* Montos por defecto */}
@@ -281,6 +283,7 @@ export default function ConfiguracionScreen() {
         </TouchableOpacity>
 
       </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   )
 }

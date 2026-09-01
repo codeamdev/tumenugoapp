@@ -177,8 +177,8 @@ function UserModal({ visible, editing, onClose, onDone, isConnected, c }: {
             <Ionicons name="close" size={24} color={c.textSecondary} />
           </TouchableOpacity>
         </View>
-        <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-          <ScrollView contentContainerStyle={s.modalBody}>
+        <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+          <ScrollView contentContainerStyle={s.modalBody} keyboardShouldPersistTaps="handled">
             <Text style={s.label}>Nombre completo *</Text>
             <TextInput
               style={s.input}
