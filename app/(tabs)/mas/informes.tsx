@@ -28,32 +28,29 @@ function localDateStr(d: Date): string {
   return `${y}-${m}-${day}`
 }
 
-function getFromTo(range: Range): { from: string; to: string } {
+function getQueryParams(range: Range): string {
   const now = new Date()
 
   if (range === 'today') {
-    const today = localDateStr(now)
-    return { from: today, to: today }
+    return 'range=shift'
   }
 
   if (range === 'week') {
-    // Semana: lunes → domingo
     const d = new Date(now)
-    const day = d.getDay() // 0=Dom, 1=Lun, ..., 6=Sáb
+    const day = d.getDay()
     const diffToMonday = day === 0 ? -6 : 1 - day
     d.setDate(d.getDate() + diffToMonday)
     const monday = localDateStr(d)
     const sun = new Date(d)
     sun.setDate(d.getDate() + 6)
-    return { from: monday, to: localDateStr(sun) }
+    return `from=${monday}&to=${localDateStr(sun)}`
   }
 
-  // month: del 1 al último día del mes actual (29/30/31 según corresponda)
   const year  = now.getFullYear()
   const month = now.getMonth()
   const first = new Date(year, month, 1)
-  const last  = new Date(year, month + 1, 0)  // día 0 del mes siguiente = último del actual
-  return { from: localDateStr(first), to: localDateStr(last) }
+  const last  = new Date(year, month + 1, 0)
+  return `from=${localDateStr(first)}&to=${localDateStr(last)}`
 }
 
 interface DayPoint  { date: string; sales: number }
@@ -110,12 +107,11 @@ export default function InformesScreen() {
   if (user && !['admin', 'cajero'].includes(user.role)) return null
 
   const [range, setRange] = useState<Range>('today')
-  const { from, to } = getFromTo(range)
 
   const { data, isLoading, isError, isRefetching, refetch } = useQuery({
     queryKey: ['informes', range],
     queryFn:  () =>
-      api.get<{ data: InformeData }>(`/api/tenant/informes?from=${from}&to=${to}`)
+      api.get<{ data: InformeData }>(`/api/tenant/informes?${getQueryParams(range)}`)
          .then((r) => r.data),
   })
 
