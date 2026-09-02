@@ -1006,6 +1006,7 @@ export default function PedidosScreen() {
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [hFilterMethod, setHFilterMethod] = useState<string | null>(null)
   const [hFilterType,   setHFilterType]   = useState<string | null>(null)
+  const [filterOpen,    setFilterOpen]    = useState(false)
 
   const activeQuery = useQuery({
     queryKey: ['orders', 'active'],
@@ -1111,69 +1112,99 @@ export default function PedidosScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* Status sub-tabs */}
-      <ScrollView
-        horizontal showsHorizontalScrollIndicator={false}
-        style={s.tabBar} contentContainerStyle={s.tabContent}
-      >
-        {tabs.map((t) => {
-          const count = mode === 'active'
-            ? (t.key === 'all' ? activeOrders.length : activeOrders.filter((o) => o.status === t.key).length)
-            : (t.key === 'all' ? completedOrders.length : cancelledOrders.length)
-          const active = currTab === t.key
-          return (
-            <TouchableOpacity
-              key={t.key}
-              style={[s.tab, active && { backgroundColor: PRIMARY }]}
-              onPress={() => setTab(t.key)}
-            >
-              <Text style={[s.tabText, active && { color: c.textInverse }]}>
-                {t.label}{count > 0 ? ` (${count})` : ''}
-              </Text>
-            </TouchableOpacity>
-          )
-        })}
-      </ScrollView>
-
-      {/* Filtros historial */}
-      {mode === 'historial' && (
+      {/* Status sub-tabs + filter icon */}
+      <View style={{ flexDirection: 'row', alignItems: 'center', borderBottomWidth: 1, borderBottomColor: c.border }}>
         <ScrollView
           horizontal showsHorizontalScrollIndicator={false}
-          style={{ borderBottomWidth: 1, borderBottomColor: c.border }}
-          contentContainerStyle={{ flexDirection: 'row', gap: 6, paddingHorizontal: 12, paddingVertical: 8 }}
+          style={[s.tabBar, { borderBottomWidth: 0, flex: 1 }]} contentContainerStyle={s.tabContent}
         >
-          {tenantMethods.map((m) => {
-            const active = hFilterMethod === m.key
+          {tabs.map((t) => {
+            const count = mode === 'active'
+              ? (t.key === 'all' ? activeOrders.length : activeOrders.filter((o) => o.status === t.key).length)
+              : (t.key === 'all' ? completedOrders.length : cancelledOrders.length)
+            const active = currTab === t.key
             return (
               <TouchableOpacity
-                key={m.key}
-                onPress={() => setHFilterMethod(active ? null : m.key)}
-                style={[s.filterChip, active && { backgroundColor: PRIMARY, borderColor: PRIMARY }]}
+                key={t.key}
+                style={[s.tab, active && { backgroundColor: PRIMARY }]}
+                onPress={() => setTab(t.key)}
               >
-                <Text style={[s.filterChipText, active && { color: c.textInverse }]}>{m.label}</Text>
-              </TouchableOpacity>
-            )
-          })}
-          <View style={{ width: 1, backgroundColor: c.border, marginHorizontal: 2 }} />
-          {[
-            { label: 'Mesa', value: 'table' },
-            { label: 'Barra', value: 'bar' },
-            { label: 'Domicilio', value: 'delivery' },
-            { label: 'Para llevar', value: 'takeout' },
-          ].map((f) => {
-            const active = hFilterType === f.value
-            return (
-              <TouchableOpacity
-                key={f.value}
-                onPress={() => setHFilterType(active ? null : f.value)}
-                style={[s.filterChip, active && { backgroundColor: PRIMARY, borderColor: PRIMARY }]}
-              >
-                <Text style={[s.filterChipText, active && { color: c.textInverse }]}>{f.label}</Text>
+                <Text style={[s.tabText, active && { color: c.textInverse }]}>
+                  {t.label}{count > 0 ? ` (${count})` : ''}
+                </Text>
               </TouchableOpacity>
             )
           })}
         </ScrollView>
-      )}
+        {mode === 'historial' && (
+          <TouchableOpacity onPress={() => setFilterOpen(true)} style={s.filterIconBtn}>
+            <Ionicons name="options-outline" size={20} color={(hFilterMethod || hFilterType) ? PRIMARY : c.textMuted} />
+            {(hFilterMethod || hFilterType) && (
+              <View style={[s.filterDot, { backgroundColor: PRIMARY }]} />
+            )}
+          </TouchableOpacity>
+        )}
+      </View>
+
+      {/* Modal de filtros del historial */}
+      <Modal visible={filterOpen} transparent animationType="slide" onRequestClose={() => setFilterOpen(false)}>
+        <TouchableOpacity style={s.filterOverlay} activeOpacity={1} onPress={() => setFilterOpen(false)}>
+          <TouchableOpacity style={s.filterSheet} activeOpacity={1}>
+            <View style={s.filterHandle} />
+            <Text style={s.filterTitle}>Filtrar historial</Text>
+
+            <Text style={s.filterSectionLabel}>Forma de pago</Text>
+            <View style={s.filterRow}>
+              <TouchableOpacity
+                style={[s.filterChip, !hFilterMethod && { backgroundColor: PRIMARY, borderColor: PRIMARY }]}
+                onPress={() => setHFilterMethod(null)}
+              >
+                <Text style={[s.filterChipText, !hFilterMethod && { color: c.textInverse }]}>Todas</Text>
+              </TouchableOpacity>
+              {tenantMethods.map((m) => (
+                <TouchableOpacity
+                  key={m.key}
+                  style={[s.filterChip, hFilterMethod === m.key && { backgroundColor: PRIMARY, borderColor: PRIMARY }]}
+                  onPress={() => setHFilterMethod(hFilterMethod === m.key ? null : m.key)}
+                >
+                  <Text style={[s.filterChipText, hFilterMethod === m.key && { color: c.textInverse }]}>{m.label}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <Text style={s.filterSectionLabel}>Tipo de pedido</Text>
+            <View style={s.filterRow}>
+              <TouchableOpacity
+                style={[s.filterChip, !hFilterType && { backgroundColor: PRIMARY, borderColor: PRIMARY }]}
+                onPress={() => setHFilterType(null)}
+              >
+                <Text style={[s.filterChipText, !hFilterType && { color: c.textInverse }]}>Todos</Text>
+              </TouchableOpacity>
+              {([
+                { label: 'Mesa', value: 'table' },
+                { label: 'Barra', value: 'bar' },
+                { label: 'Domicilio', value: 'delivery' },
+                { label: 'Para llevar', value: 'takeout' },
+              ] as const).map((f) => (
+                <TouchableOpacity
+                  key={f.value}
+                  style={[s.filterChip, hFilterType === f.value && { backgroundColor: PRIMARY, borderColor: PRIMARY }]}
+                  onPress={() => setHFilterType(hFilterType === f.value ? null : f.value)}
+                >
+                  <Text style={[s.filterChipText, hFilterType === f.value && { color: c.textInverse }]}>{f.label}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <TouchableOpacity
+              style={[s.filterApplyBtn, { backgroundColor: PRIMARY }]}
+              onPress={() => setFilterOpen(false)}
+            >
+              <Text style={s.filterApplyText}>Aplicar</Text>
+            </TouchableOpacity>
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
 
       {isLoading
         ? <View style={s.centered}><ActivityIndicator size="large" color={PRIMARY} /></View>
@@ -1231,11 +1262,23 @@ function makePedidosStyles(c: ReturnType<typeof useAppColors>) {
     tabContent:{ paddingHorizontal: 12, paddingVertical: 10, gap: 6, flexDirection: 'row', alignItems: 'center' },
 
     filterChip: {
-      paddingHorizontal: 10, paddingVertical: 5, borderRadius: 16,
+      paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16,
       borderWidth: 1.5, borderColor: c.border, backgroundColor: c.surface,
     },
-    filterChipText: { fontSize: 12, fontWeight: '600', color: c.textSecondary },
+    filterChipText: { fontSize: 13, fontWeight: '600', color: c.textSecondary },
     tab:       { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, backgroundColor: c.surfaceAlt },
     tabText:   { fontSize: 13, color: c.textMuted, fontWeight: '600' },
+
+    filterIconBtn: { paddingHorizontal: 12, paddingVertical: 10, position: 'relative' },
+    filterDot:     { position: 'absolute', top: 8, right: 8, width: 7, height: 7, borderRadius: 4 },
+
+    filterOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
+    filterSheet:   { backgroundColor: c.surface, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, paddingBottom: 36, gap: 14 },
+    filterHandle:  { width: 40, height: 4, borderRadius: 2, backgroundColor: c.border, alignSelf: 'center', marginBottom: 4 },
+    filterTitle:   { fontSize: 16, fontWeight: '800', color: c.text },
+    filterSectionLabel: { fontSize: 11, fontWeight: '700', color: c.textMuted, textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: -6 },
+    filterRow:     { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+    filterApplyBtn:{ paddingVertical: 14, borderRadius: 12, alignItems: 'center', marginTop: 4 },
+    filterApplyText:{ fontSize: 15, fontWeight: '700', color: '#fff' },
   })
 }
