@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  ActivityIndicator, RefreshControl,
+  ActivityIndicator, RefreshControl, Modal, TextInput, KeyboardAvoidingView, Platform,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useRouter } from 'expo-router'
@@ -58,19 +58,31 @@ interface TopProduct { name: string; qty: number; revenue: number }
 interface ByCat      { name: string; emoji: string | null; revenue: number; qty: number }
 interface LowItem    { name: string; qty: number }
 
-interface PendingPayment { id: string; closedAt: string | null; total: number; customerName: string }
+interface PendingPayment { id: string; closedAt: string | null; total: number; customerName: string; paymentNotes: string }
+interface PaymentMethodCfg { key: string; label: string; isCredit?: boolean }
 
 interface InformeData {
   period: { from: string; to: string }
   kpis: { totalSales: number; totalOrders: number; totalPending?: number; pendingCount?: number }
   byMethod: Record<string, number>
   paymentMethodLabels: Record<string, string>
+  paymentMethods?: PaymentMethodCfg[]
   byType: Record<string, number>
   dailySeries: DayPoint[]
   topProducts: TopProduct[]
   byCategory: ByCat[]
   lowRotation: LowItem[]
   pendingPayments?: PendingPayment[]
+}
+
+interface CollectState {
+  orderId: string
+  customerName: string
+  total: number
+  method: string
+  amount: string
+  notes: string
+  saving: boolean
 }
 
 // ── Simple bar for relative values ───────────────────────────────────────────
@@ -107,6 +119,7 @@ export default function InformesScreen() {
   if (user && !['admin', 'cajero'].includes(user.role)) return null
 
   const [range, setRange] = useState<Range>('today')
+  const [collect, setCollect] = useState<CollectState | null>(null)
 
   const { data, isLoading, isError, isRefetching, refetch } = useQuery({
     queryKey: ['informes', range],
@@ -125,6 +138,36 @@ export default function InformesScreen() {
 
   const d = data
   const fmt = (n: number) => formatCurrency(n, sign)
+
+  function openCollect(p: PendingPayment) {
+    const methods = (d?.paymentMethods ?? []).filter((m) => !m.isCredit)
+    setCollect({
+      orderId: p.id,
+      customerName: p.customerName,
+      total: p.total,
+      method: methods[0]?.key ?? 'cash',
+      amount: String(p.total),
+      notes: '',
+      saving: false,
+    })
+  }
+
+  async function saveCollect() {
+    if (!collect) return
+    setCollect((c) => c && ({ ...c, saving: true }))
+    try {
+      await api.patch(`/api/tenant/orders/${collect.orderId}`, {
+        action: 'collect_credit',
+        payments: [{ method: collect.method, amount: parseFloat(collect.amount) || collect.total }],
+        paymentNotes: collect.notes || undefined,
+      })
+      setCollect(null)
+      refetch()
+    } catch (e: any) {
+      alert(e?.message ?? 'Error al cobrar')
+      setCollect((c) => c && ({ ...c, saving: false }))
+    }
+  }
 
   const maxSales  = d?.topProducts?.[0]?.qty ?? 1
   const maxCatRev = d?.byCategory?.[0]?.revenue ?? 1
@@ -278,6 +321,28 @@ export default function InformesScreen() {
         </View>
       )}
 
+      {/* ── Cuentas por cobrar ── */}
+      {(d?.pendingPayments?.length ?? 0) > 0 && (
+        <View style={s.section}>
+          <View style={s.sectionHeader}>
+            <Ionicons name="time-outline" size={15} color="#f59e0b" />
+            <Text style={s.sectionTitle}>Cuentas por cobrar</Text>
+          </View>
+          {d!.pendingPayments!.map((p) => (
+            <View key={p.id} style={s.pendingRow}>
+              <View style={{ flex: 1 }}>
+                <Text style={s.pendingName} numberOfLines={1}>{p.customerName}</Text>
+                {!!p.paymentNotes && <Text style={s.pendingNote} numberOfLines={1}>{p.paymentNotes}</Text>}
+              </View>
+              <Text style={s.pendingAmt}>{fmt(p.total)}</Text>
+              <TouchableOpacity style={s.cobrarBtn} onPress={() => openCollect(p)}>
+                <Text style={s.cobrarBtnText}>Cobrar</Text>
+              </TouchableOpacity>
+            </View>
+          ))}
+        </View>
+      )}
+
       {d?.kpis.totalOrders === 0 && (
         <View style={s.empty}>
           <Ionicons name="bar-chart-outline" size={48} color={c.border} />
@@ -285,6 +350,65 @@ export default function InformesScreen() {
         </View>
       )}
     </ScrollView>
+
+    {/* ── Modal cobrar ── */}
+    <Modal visible={collect !== null} transparent animationType="fade" onRequestClose={() => !collect?.saving && setCollect(null)}>
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
+        <TouchableOpacity style={s.modalOverlay} activeOpacity={1} onPress={() => !collect?.saving && setCollect(null)}>
+          <TouchableOpacity style={s.modalCard} activeOpacity={1}>
+            {collect && (
+              <>
+                <Text style={s.modalTitle}>Cobrar — {collect.customerName}</Text>
+                <Text style={s.modalSub}>Total pendiente: <Text style={s.modalSubBold}>{fmt(collect.total)}</Text></Text>
+
+                <Text style={s.fieldLabel}>Forma de pago</Text>
+                <View style={s.methodChips}>
+                  {(d?.paymentMethods ?? []).filter((m) => !m.isCredit).map((m) => (
+                    <TouchableOpacity
+                      key={m.key}
+                      style={[s.chip, collect.method === m.key && s.chipActive]}
+                      onPress={() => setCollect((c) => c && ({ ...c, method: m.key }))}
+                    >
+                      <Text style={[s.chipText, collect.method === m.key && s.chipTextActive]}>{m.label}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+
+                <Text style={s.fieldLabel}>Monto recibido</Text>
+                <TextInput
+                  style={s.input}
+                  keyboardType="numeric"
+                  value={collect.amount}
+                  onChangeText={(v) => setCollect((c) => c && ({ ...c, amount: v }))}
+                  placeholder={String(collect.total)}
+                  placeholderTextColor={c.textMuted}
+                />
+
+                <Text style={s.fieldLabel}>Observaciones (opcional)</Text>
+                <TextInput
+                  style={s.input}
+                  value={collect.notes}
+                  onChangeText={(v) => setCollect((c) => c && ({ ...c, notes: v }))}
+                  placeholder="Ej: pagó en dos cuotas..."
+                  placeholderTextColor={c.textMuted}
+                />
+
+                <View style={s.modalBtns}>
+                  <TouchableOpacity style={s.cancelBtn} onPress={() => setCollect(null)} disabled={collect.saving}>
+                    <Text style={s.cancelBtnText}>Cancelar</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={s.confirmBtn} onPress={saveCollect} disabled={collect.saving}>
+                    {collect.saving
+                      ? <ActivityIndicator size="small" color="#fff" />
+                      : <Text style={s.confirmBtnText}>Confirmar cobro</Text>}
+                  </TouchableOpacity>
+                </View>
+              </>
+            )}
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </KeyboardAvoidingView>
+    </Modal>
     </SafeAreaView>
   )
 }
@@ -348,5 +472,30 @@ function makeStyles(c: ReturnType<typeof import('@/lib/theme').useAppColors>) {
 
     empty:     { alignItems: 'center', justifyContent: 'center', padding: 40, gap: 12 },
     emptyText: { color: c.textMuted, fontSize: 14 },
+
+    pendingRow:  { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 6, borderTopWidth: 1, borderTopColor: c.background },
+    pendingName: { fontSize: 13, fontWeight: '600', color: c.text },
+    pendingNote: { fontSize: 11, color: c.textMuted },
+    pendingAmt:  { fontSize: 14, fontWeight: '700', color: '#d97706' },
+    cobrarBtn:   { backgroundColor: '#16a34a', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6 },
+    cobrarBtnText: { color: '#fff', fontSize: 12, fontWeight: '700' },
+
+    modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'center', alignItems: 'center', padding: 16 },
+    modalCard:    { backgroundColor: c.surface, borderRadius: 20, padding: 24, width: '100%', maxWidth: 380, gap: 12 },
+    modalTitle:   { fontSize: 16, fontWeight: '800', color: c.text },
+    modalSub:     { fontSize: 13, color: c.textMuted },
+    modalSubBold: { fontWeight: '700', color: c.text },
+    fieldLabel:   { fontSize: 11, fontWeight: '600', color: c.textMuted, textTransform: 'uppercase', letterSpacing: 0.4 },
+    methodChips:  { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+    chip:         { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10, borderWidth: 1, borderColor: c.border, backgroundColor: c.surfaceAlt },
+    chipActive:   { backgroundColor: '#2563eb', borderColor: '#2563eb' },
+    chipText:     { fontSize: 13, color: c.textSecondary, fontWeight: '600' },
+    chipTextActive: { color: '#fff' },
+    input:        { borderWidth: 1, borderColor: c.border, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, fontSize: 15, color: c.text, backgroundColor: c.surfaceAlt },
+    modalBtns:    { flexDirection: 'row', gap: 10, marginTop: 4 },
+    cancelBtn:    { flex: 1, borderWidth: 1, borderColor: c.border, borderRadius: 10, padding: 12, alignItems: 'center' },
+    cancelBtnText: { fontSize: 14, fontWeight: '600', color: c.textSecondary },
+    confirmBtn:   { flex: 1, backgroundColor: '#16a34a', borderRadius: 10, padding: 12, alignItems: 'center' },
+    confirmBtnText: { fontSize: 14, fontWeight: '700', color: '#fff' },
   })
 }
