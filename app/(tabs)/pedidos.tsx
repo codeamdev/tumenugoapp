@@ -996,8 +996,9 @@ export default function PedidosScreen() {
   const c = useAppColors()
   const s = makePedidosStyles(c)
   const qc = useQueryClient()
-  const { tenant, user } = useAuthStore()
+  const { tenant, user, config } = useAuthStore()
   const PRIMARY = tenant?.primaryColor ?? '#2563eb'
+  const tenantMethods = config?.paymentMethods ?? []
 
   const [mode, setMode]         = useState<'active' | 'historial'>('active')
   const [activeTab, setActiveTab] = useState<OrderStatus | 'all'>('all')
@@ -1141,20 +1142,15 @@ export default function PedidosScreen() {
           style={{ borderBottomWidth: 1, borderBottomColor: c.border }}
           contentContainerStyle={{ flexDirection: 'row', gap: 6, paddingHorizontal: 12, paddingVertical: 8 }}
         >
-          {[
-            { label: 'Efectivo', value: 'cash', group: 'method' },
-            { label: 'Nequi', value: 'nequi', group: 'method' },
-            { label: 'Tarjeta', value: 'card', group: 'method' },
-            { label: 'Transf.', value: 'transfer', group: 'method' },
-          ].map((f) => {
-            const active = hFilterMethod === f.value
+          {tenantMethods.map((m) => {
+            const active = hFilterMethod === m.key
             return (
               <TouchableOpacity
-                key={f.value}
-                onPress={() => setHFilterMethod(active ? null : f.value)}
+                key={m.key}
+                onPress={() => setHFilterMethod(active ? null : m.key)}
                 style={[s.filterChip, active && { backgroundColor: PRIMARY, borderColor: PRIMARY }]}
               >
-                <Text style={[s.filterChipText, active && { color: c.textInverse }]}>{f.label}</Text>
+                <Text style={[s.filterChipText, active && { color: c.textInverse }]}>{m.label}</Text>
               </TouchableOpacity>
             )
           })}
