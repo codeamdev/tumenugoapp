@@ -687,9 +687,9 @@ function OrderCard({ listOrder, expanded, onToggle, onRefresh, readOnly }: {
       {/* ── Fila cabecera (siempre visible, tap = expand/collapse) ── */}
       <TouchableOpacity style={s.row} onPress={onToggle} activeOpacity={0.75}>
         <View style={{ flex: 1 }}>
-          <Text style={s.rowOrigin}>{origin}</Text>
+          <Text style={s.rowOrigin}>{order.displayCode ?? `#${order.id.slice(-6).toUpperCase()}`}</Text>
           <Text style={s.rowMeta} numberOfLines={1}>
-            {order.displayCode ?? `#${order.id.slice(-6).toUpperCase()}`}
+            {origin}
             {order.customerName ? `  ·  ${order.customerName}` : ''}
             {order.createdAt ? `  ·  ${formatDateTime(order.createdAt)}` : ''}
           </Text>
