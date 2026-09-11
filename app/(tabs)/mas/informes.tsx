@@ -58,7 +58,18 @@ interface TopProduct { name: string; qty: number; revenue: number }
 interface ByCat      { name: string; emoji: string | null; revenue: number; qty: number }
 interface LowItem    { name: string; qty: number }
 
-interface PendingPayment { id: string; closedAt: string | null; total: number; customerName: string; paymentNotes: string }
+interface PendingPayment {
+  id: string
+  displayCode: string | null
+  closedAt: string | null
+  total: number
+  customerName: string
+  paymentNotes: string
+  type: string
+  tableName: string | null
+  notes: string | null
+  items: { name: string; quantity: number; unitPrice: string }[]
+}
 interface PaymentMethodCfg { key: string; label: string; isCredit?: boolean }
 
 interface InformeData {
@@ -120,6 +131,7 @@ export default function InformesScreen() {
 
   const [range, setRange] = useState<Range>('today')
   const [collect, setCollect] = useState<CollectState | null>(null)
+  const [expandedPending, setExpandedPending] = useState<string | null>(null)
 
   const { data, isLoading, isError, isRefetching, refetch } = useQuery({
     queryKey: ['informes', range],
@@ -212,6 +224,56 @@ export default function InformesScreen() {
           <Text style={s.kpiLabel}>Pedidos cobrados</Text>
         </View>
       </View>
+
+      {/* ── Cuentas por cobrar (siempre al tope) ── */}
+      {(d?.pendingPayments?.length ?? 0) > 0 && (
+        <View style={s.section}>
+          <View style={s.sectionHeader}>
+            <Ionicons name="time-outline" size={15} color="#f59e0b" />
+            <Text style={s.sectionTitle}>Cuentas por cobrar</Text>
+            <Text style={{ marginLeft: 'auto', fontSize: 13, fontWeight: '700', color: '#d97706' }}>
+              {fmt(d!.pendingPayments!.reduce((sum, p) => sum + p.total, 0))}
+            </Text>
+          </View>
+          {d!.pendingPayments!.map((p) => {
+            const isOpen = expandedPending === p.id
+            const origin = p.type === 'table' ? `Mesa ${p.tableName ?? ''}` : p.type === 'delivery' ? 'Domicilio' : p.type === 'bar' ? 'Barra' : 'Para llevar'
+            return (
+              <View key={p.id}>
+                <TouchableOpacity style={s.pendingRow} onPress={() => setExpandedPending(isOpen ? null : p.id)}>
+                  <View style={{ flex: 1 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                      {p.displayCode && <Text style={{ fontSize: 11, fontFamily: 'monospace', color: c.textMuted }}>{p.displayCode}</Text>}
+                      <Text style={{ fontSize: 11, color: c.textMuted }}>{origin}</Text>
+                    </View>
+                    {!!p.customerName && p.customerName !== '—' && (
+                      <Text style={s.pendingName} numberOfLines={1}>{p.customerName}</Text>
+                    )}
+                    <Text style={s.pendingNote}>
+                      {p.closedAt ? new Date(p.closedAt).toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: 'numeric' }) : ''}
+                    </Text>
+                  </View>
+                  <Text style={s.pendingAmt}>{fmt(p.total)}</Text>
+                  <TouchableOpacity style={s.cobrarBtn} onPress={() => openCollect(p)}>
+                    <Text style={s.cobrarBtnText}>Cobrar</Text>
+                  </TouchableOpacity>
+                </TouchableOpacity>
+                {isOpen && (
+                  <View style={{ paddingHorizontal: 12, paddingBottom: 8, gap: 4 }}>
+                    {!!p.notes && <Text style={{ fontSize: 12, color: c.textMuted, fontStyle: 'italic' }}>Nota: {p.notes}</Text>}
+                    {p.items.map((it, i) => (
+                      <View key={i} style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                        <Text style={{ fontSize: 12, color: c.text }}>{it.quantity}× {it.name}</Text>
+                        <Text style={{ fontSize: 12, fontWeight: '600', color: c.text }}>{fmt(parseFloat(it.unitPrice) * it.quantity)}</Text>
+                      </View>
+                    ))}
+                  </View>
+                )}
+              </View>
+            )
+          })}
+        </View>
+      )}
 
       {/* ── Ventas por día ── */}
       {d && (d.dailySeries?.length ?? 0) > 0 && (
@@ -316,28 +378,6 @@ export default function InformesScreen() {
               <Text style={[s.lowQty, p.qty === 0 ? s.lowQtyZero : s.lowQtyLow]}>
                 {p.qty === 0 ? 'Sin ventas' : `${p.qty} uds`}
               </Text>
-            </View>
-          ))}
-        </View>
-      )}
-
-      {/* ── Cuentas por cobrar ── */}
-      {(d?.pendingPayments?.length ?? 0) > 0 && (
-        <View style={s.section}>
-          <View style={s.sectionHeader}>
-            <Ionicons name="time-outline" size={15} color="#f59e0b" />
-            <Text style={s.sectionTitle}>Cuentas por cobrar</Text>
-          </View>
-          {d!.pendingPayments!.map((p) => (
-            <View key={p.id} style={s.pendingRow}>
-              <View style={{ flex: 1 }}>
-                <Text style={s.pendingName} numberOfLines={1}>{p.customerName}</Text>
-                {!!p.paymentNotes && <Text style={s.pendingNote} numberOfLines={1}>{p.paymentNotes}</Text>}
-              </View>
-              <Text style={s.pendingAmt}>{fmt(p.total)}</Text>
-              <TouchableOpacity style={s.cobrarBtn} onPress={() => openCollect(p)}>
-                <Text style={s.cobrarBtnText}>Cobrar</Text>
-              </TouchableOpacity>
             </View>
           ))}
         </View>

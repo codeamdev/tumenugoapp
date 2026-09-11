@@ -1000,6 +1000,9 @@ export default function PedidosScreen() {
   const PRIMARY = tenant?.primaryColor ?? '#2563eb'
   const tenantMethods = config?.paymentMethods ?? []
 
+  function colToday(): string {
+    return new Date().toLocaleDateString('en-CA', { timeZone: 'America/Bogota' })
+  }
   const [mode, setMode]         = useState<'active' | 'historial'>('active')
   const [activeTab, setActiveTab] = useState<OrderStatus | 'all'>('all')
   const [histTab, setHistTab]   = useState<'all' | 'cancelled'>('all')
@@ -1007,6 +1010,7 @@ export default function PedidosScreen() {
   const [hFilterMethod, setHFilterMethod] = useState<string | null>(null)
   const [hFilterType,   setHFilterType]   = useState<string | null>(null)
   const [filterOpen,    setFilterOpen]    = useState(false)
+  const [hDate,         setHDate]         = useState(colToday)
 
   const activeQuery = useQuery({
     queryKey: ['orders', 'active'],
@@ -1029,11 +1033,26 @@ export default function PedidosScreen() {
   })
 
   const historialQuery = useQuery({
-    queryKey: ['orders', 'historial'],
-    queryFn: () => api.get<{ data: Order[] }>('/api/tenant/orders?historial=true').then((r) => r.data ?? []),
+    queryKey: ['orders', 'historial', hDate],
+    queryFn: () => api.get<{ data: Order[] }>(`/api/tenant/orders?historial=true&from=${hDate}&to=${hDate}`).then((r) => r.data ?? []),
     enabled: mode === 'historial',
     staleTime: 60_000,
   })
+
+  function shiftDay(delta: number) {
+    const d = new Date(hDate + 'T12:00:00')
+    d.setDate(d.getDate() + delta)
+    setHDate(d.toISOString().slice(0, 10))
+  }
+
+  function hDateLabel(iso: string): string {
+    const today = colToday()
+    if (iso === today) return 'Hoy'
+    const d = new Date(iso + 'T12:00:00')
+    const prev = new Date(today + 'T12:00:00'); prev.setDate(prev.getDate() - 1)
+    if (iso === prev.toISOString().slice(0, 10)) return 'Ayer'
+    return d.toLocaleDateString('es-CO', { weekday: 'short', day: 'numeric', month: 'short' })
+  }
 
   const activeOrders    = activeQuery.data ?? []
   const historialOrders = historialQuery.data ?? []
@@ -1075,10 +1094,10 @@ export default function PedidosScreen() {
     if (mode === 'active') {
       qc.invalidateQueries({ queryKey: ['orders', 'active'] })
     } else {
-      qc.invalidateQueries({ queryKey: ['orders', 'historial'] })
+      qc.invalidateQueries({ queryKey: ['orders', 'historial', hDate] })
     }
     refetch()
-  }, [qc, refetch, mode])
+  }, [qc, refetch, mode, hDate])
 
   function toggleExpand(id: string) {
     setExpandedId((prev) => (prev === id ? null : id))
@@ -1111,6 +1130,31 @@ export default function PedidosScreen() {
           <Text style={[s.modeBtnText, mode === 'historial' && { color: c.textInverse }]}>Historial</Text>
         </TouchableOpacity>
       </View>
+
+      {/* Day navigator (historial only) */}
+      {mode === 'historial' && (
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 12, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: c.border }}>
+          <TouchableOpacity onPress={() => shiftDay(-1)} style={{ padding: 6 }}>
+            <Ionicons name="chevron-back" size={20} color={c.text} />
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => { if (hDate !== colToday()) setHDate(colToday()) }}
+            style={{ alignItems: 'center' }}
+          >
+            <Text style={{ fontSize: 15, fontWeight: '600', color: c.text }}>{hDateLabel(hDate)}</Text>
+            {hDate !== colToday() && (
+              <Text style={{ fontSize: 11, color: PRIMARY, marginTop: 1 }}>Ir a hoy</Text>
+            )}
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => shiftDay(1)}
+            disabled={hDate >= colToday()}
+            style={{ padding: 6, opacity: hDate >= colToday() ? 0.3 : 1 }}
+          >
+            <Ionicons name="chevron-forward" size={20} color={c.text} />
+          </TouchableOpacity>
+        </View>
+      )}
 
       {/* Status sub-tabs + filter icon */}
       <View style={{ flexDirection: 'row', alignItems: 'center', borderBottomWidth: 1, borderBottomColor: c.border }}>
