@@ -105,11 +105,11 @@ function PayModal({ order, onClose, onRefresh }: {
       return
     }
     if (isCredit && !customerName.trim()) {
-      Alert.alert('Nombre requerido', 'Ingresa el nombre del cliente para el fiado.')
+      Alert.alert('Nombre requerido', 'Ingresa el nombre del cliente para el crédito.')
       return
     }
     if (isCredit && !paymentNotes.trim()) {
-      Alert.alert('Observación requerida', 'Ingresa las observaciones para el fiado.')
+      Alert.alert('Observación requerida', 'Ingresa las observaciones para el crédito.')
       return
     }
     setLoading(true)
@@ -295,7 +295,7 @@ function PayModal({ order, onClose, onRefresh }: {
             >
               {loading
                 ? <ActivityIndicator color={c.textInverse} />
-                : <Text style={s.confirmBtnText}>{isCredit ? 'Registrar fiado' : 'Confirmar cobro'}</Text>}
+                : <Text style={s.confirmBtnText}>{isCredit ? 'Registrar crédito' : 'Confirmar cobro'}</Text>}
             </TouchableOpacity>
           </ScrollView>
         </KeyboardAvoidingView>

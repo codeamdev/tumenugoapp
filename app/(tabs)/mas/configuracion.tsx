@@ -248,7 +248,7 @@ export default function ConfiguracionScreen() {
               editable={isConnected}
             />
             <View style={styles.pmCreditRow}>
-              <Text style={[styles.hint, { marginBottom: 0 }]}>Fiado</Text>
+              <Text style={[styles.hint, { marginBottom: 0 }]}>Crédito</Text>
               <Switch
                 value={newMethodCredit}
                 onValueChange={setNewCredit}
