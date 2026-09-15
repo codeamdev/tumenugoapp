@@ -18,13 +18,14 @@ async function secureDelete(key: string): Promise<void> {
   await SecureStore.deleteItemAsync(key)
 }
 
-const TOKEN_KEY          = 'cf_access_token'
-const REFRESH_TOKEN_KEY  = 'cf_refresh_token'
-const USER_KEY           = 'cf_user'
-const TENANT_KEY         = 'cf_tenant'
-const CONFIG_KEY         = 'cf_config'
-const OFFLINE_CRED_KEY   = 'cf_offline_cred'   // { email, hash }
-const SESSION_LOCKED_KEY = 'cf_session_locked'  // 'true' cuando cerró sesión sin borrar tokens
+const TOKEN_KEY           = 'cf_access_token'
+const REFRESH_TOKEN_KEY   = 'cf_refresh_token'
+const USER_KEY            = 'cf_user'
+const TENANT_KEY          = 'cf_tenant'
+const CONFIG_KEY          = 'cf_config'
+const OFFLINE_CRED_KEY    = 'cf_offline_cred'      // { email, hash }
+const SESSION_LOCKED_KEY  = 'cf_session_locked'    // 'true' cuando cerró sesión sin borrar tokens
+const BIOMETRIC_ENABLED_KEY = 'cf_biometric_enabled' // 'true' cuando el usuario activó biometría
 
 // ─── Tokens ──────────────────────────────────────────────────────────────────
 
@@ -66,6 +67,7 @@ export async function clearSession(): Promise<void> {
   await AsyncStorage.multiRemove([USER_KEY, TENANT_KEY, CONFIG_KEY])
   await secureDelete(OFFLINE_CRED_KEY)
   await secureDelete(SESSION_LOCKED_KEY)
+  await secureDelete(BIOMETRIC_ENABLED_KEY)
 }
 
 // ─── Credenciales offline ─────────────────────────────────────────────────────
@@ -114,4 +116,15 @@ export async function isSessionLocked(): Promise<boolean> {
 
 export async function unlockSession(): Promise<void> {
   await secureDelete(SESSION_LOCKED_KEY)
+}
+
+// ─── Biometría ────────────────────────────────────────────────────────────────
+
+export async function setBiometricEnabled(val: boolean): Promise<void> {
+  if (val) await secureSet(BIOMETRIC_ENABLED_KEY, 'true')
+  else await secureDelete(BIOMETRIC_ENABLED_KEY)
+}
+
+export async function getBiometricEnabled(): Promise<boolean> {
+  return (await secureGet(BIOMETRIC_ENABLED_KEY)) === 'true'
 }

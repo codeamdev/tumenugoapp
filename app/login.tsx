@@ -1,13 +1,19 @@
+'use client'
 import { useState, useRef, useEffect } from 'react'
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
   KeyboardAvoidingView, Platform, ScrollView, ActivityIndicator, Alert, Modal, FlatList,
 } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
+import * as LocalAuthentication from 'expo-local-authentication'
 import { useAuthStore, hasOfflineCredential } from '@/stores/auth-store'
 import { ApiError } from '@/lib/api'
 import { useNetworkStatus } from '@/hooks/use-network'
 import { useAppColors } from '@/lib/theme'
+import {
+  getBiometricEnabled, setBiometricEnabled,
+  unlockSession, isSessionLocked,
+} from '@/lib/auth'
 
 // ─── Selector de tenant ───────────────────────────────────────────────────────
 
@@ -68,7 +74,7 @@ function makeTenantPickerStyles(c: ReturnType<typeof useAppColors>) {
 // ─── Pantalla de login ────────────────────────────────────────────────────────
 
 export default function LoginScreen() {
-  const { login, offlineLogin } = useAuthStore()
+  const { login, offlineLogin, restore } = useAuthStore()
   const { isConnected } = useNetworkStatus()
   const c = useAppColors()
   const s = makeLoginStyles(c)
@@ -77,21 +83,95 @@ export default function LoginScreen() {
   const [email,         setEmail]         = useState('')
   const [password,      setPassword]      = useState('')
   const [loading,       setLoading]       = useState(false)
+  const [bioLoading,    setBioLoading]    = useState(false)
   const [showPassword,  setShowPassword]  = useState(false)
   const [emailFocused,  setEmailFocused]  = useState(false)
   const [passFocused,   setPassFocused]   = useState(false)
   const [hasOffline,    setHasOffline]    = useState(false)
+
+  // biometría: null = aún chequeando, false = no disponible/activo, 'fingerprint' | 'face' = disponible
+  const [bioType,       setBioType]       = useState<null | false | 'fingerprint' | 'face'>(null)
 
   const [tenantOptions, setTenantOptions] = useState<TenantOption[] | null>(null)
   const [pendingCreds,  setPendingCreds]  = useState<{ email: string; password: string } | null>(null)
 
   useEffect(() => {
     hasOfflineCredential().then(setHasOffline)
+    checkBiometricAvailability()
   }, [])
+
+  async function checkBiometricAvailability() {
+    try {
+      const [locked, bioEnabled, hasHardware, isEnrolled] = await Promise.all([
+        isSessionLocked(),
+        getBiometricEnabled(),
+        LocalAuthentication.hasHardwareAsync(),
+        LocalAuthentication.isEnrolledAsync(),
+      ])
+
+      // Solo mostrar biometría si: sesión bloqueada (post-logout) + usuario la activó + dispositivo la soporta
+      if (!locked || !bioEnabled || !hasHardware || !isEnrolled) {
+        setBioType(false)
+        return
+      }
+
+      const types = await LocalAuthentication.supportedAuthenticationTypesAsync()
+      const hasFace = types.includes(LocalAuthentication.AuthenticationType.FACIAL_RECOGNITION)
+      setBioType(hasFace ? 'face' : 'fingerprint')
+
+      // Auto-trigger al abrir la pantalla
+      triggerBiometric()
+    } catch {
+      setBioType(false)
+    }
+  }
+
+  async function triggerBiometric() {
+    setBioLoading(true)
+    try {
+      const result = await LocalAuthentication.authenticateAsync({
+        promptMessage: 'Ingresa a CafeteriaOS',
+        cancelLabel: 'Usar contraseña',
+        disableDeviceFallback: true,
+      })
+      if (result.success) {
+        await unlockSession()
+        await restore()
+      }
+    } catch {
+      // El usuario canceló o el hardware falló — dejamos el form visible
+    } finally {
+      setBioLoading(false)
+    }
+  }
 
   const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())
   const canSubmit  = email.trim().length > 0 && password.length > 0 && !loading
   const isOffline  = !isConnected
+
+  async function offerBiometricIfPossible() {
+    try {
+      const [hasHardware, isEnrolled, alreadyEnabled] = await Promise.all([
+        LocalAuthentication.hasHardwareAsync(),
+        LocalAuthentication.isEnrolledAsync(),
+        getBiometricEnabled(),
+      ])
+      if (!hasHardware || !isEnrolled || alreadyEnabled) return
+
+      const types = await LocalAuthentication.supportedAuthenticationTypesAsync()
+      const hasFace = types.includes(LocalAuthentication.AuthenticationType.FACIAL_RECOGNITION)
+      const label = hasFace ? 'Face ID' : 'huella digital'
+
+      Alert.alert(
+        `¿Activar ${label}?`,
+        `La próxima vez puedes ingresar sin escribir tu contraseña.`,
+        [
+          { text: 'Ahora no', style: 'cancel' },
+          { text: 'Activar', onPress: () => setBiometricEnabled(true) },
+        ],
+      )
+    } catch { /* ignorar */ }
+  }
 
   async function handleLogin(slugOverride?: string) {
     const trimEmail = email.trim().toLowerCase()
@@ -100,7 +180,6 @@ export default function LoginScreen() {
       return
     }
 
-    // Sin conexión: saltar llamada API (evita esperar 30-60s de timeout del SO)
     if (isOffline) {
       setLoading(true)
       try {
@@ -121,6 +200,7 @@ export default function LoginScreen() {
     setLoading(true)
     try {
       await login({ email: trimEmail, password, tenantSlug: slugOverride })
+      await offerBiometricIfPossible()
     } catch (err) {
       if (err instanceof ApiError && err.status === 300) {
         const body = (err as any).body as { tenants: TenantOption[] }
@@ -159,6 +239,7 @@ export default function LoginScreen() {
     setLoading(true)
     try {
       await login({ email: pendingCreds.email, password: pendingCreds.password, tenantSlug: slug })
+      await offerBiometricIfPossible()
     } catch (err) {
       const message = err instanceof ApiError ? err.message : 'Error de conexión.'
       Alert.alert('Error al iniciar sesión', message)
@@ -167,6 +248,9 @@ export default function LoginScreen() {
       setPendingCreds(null)
     }
   }
+
+  const bioIcon = bioType === 'face' ? 'scan-outline' : 'finger-print-outline'
+  const bioLabel = bioType === 'face' ? 'Face ID' : 'Huella digital'
 
   return (
     <>
@@ -183,6 +267,24 @@ export default function LoginScreen() {
             <Text style={s.title}>Bienvenido</Text>
             <Text style={s.subtitle}>Inicia sesión para continuar</Text>
           </View>
+
+          {/* Botón biométrico — visible solo si la sesión está bloqueada y biometría activa */}
+          {bioType && (
+            <TouchableOpacity
+              style={[s.bioBtn, bioLoading && s.btnDisabled]}
+              onPress={triggerBiometric}
+              disabled={bioLoading}
+              activeOpacity={0.8}
+            >
+              {bioLoading
+                ? <ActivityIndicator color="#fff" size="small" />
+                : <>
+                    <Ionicons name={bioIcon as any} size={22} color="#fff" />
+                    <Text style={s.bioBtnText}>Entrar con {bioLabel}</Text>
+                  </>
+              }
+            </TouchableOpacity>
+          )}
 
           <View style={s.card}>
             {/* Banner sin conexión */}
@@ -261,7 +363,7 @@ export default function LoginScreen() {
               </TouchableOpacity>
             </View>
 
-            {/* Botón */}
+            {/* Botón iniciar sesión */}
             <TouchableOpacity
               style={[s.btn, !canSubmit && s.btnDisabled]}
               onPress={() => handleLogin()}
@@ -291,9 +393,9 @@ export default function LoginScreen() {
 function makeLoginStyles(c: ReturnType<typeof useAppColors>) {
   return StyleSheet.create({
     root:   { flex: 1, backgroundColor: c.surfaceAlt },
-    scroll: { flexGrow: 1, justifyContent: 'center', padding: 24 },
+    scroll: { flexGrow: 1, justifyContent: 'center', padding: 24, gap: 16 },
 
-    header: { alignItems: 'center', marginBottom: 32 },
+    header: { alignItems: 'center', marginBottom: 8 },
     logoBox: {
       width: 76, height: 76, borderRadius: 22,
       backgroundColor: '#2563eb', alignItems: 'center', justifyContent: 'center',
@@ -303,6 +405,13 @@ function makeLoginStyles(c: ReturnType<typeof useAppColors>) {
     logoEmoji: { fontSize: 38 },
     title:    { fontSize: 26, fontWeight: '800', color: c.text },
     subtitle: { fontSize: 14, color: c.textMuted, marginTop: 4 },
+
+    bioBtn: {
+      flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10,
+      backgroundColor: '#1d4ed8', borderRadius: 12, padding: 16,
+      shadowColor: '#1d4ed8', shadowOpacity: 0.3, shadowRadius: 8, elevation: 4,
+    },
+    bioBtnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
 
     card: {
       backgroundColor: c.surface, borderRadius: 16, padding: 24,
