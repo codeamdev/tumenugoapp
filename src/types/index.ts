@@ -75,6 +75,7 @@ export interface Order {
   createdAt: string | null
   updatedAt: string | null
   closedAt: string | null
+  paymentEntries?: { paymentMethod: string; amount: number }[]
   itemsCount?: number
   items?: OrderItem[]
 }

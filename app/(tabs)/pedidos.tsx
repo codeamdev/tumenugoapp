@@ -499,12 +499,13 @@ function EditPayModal({ order, onClose, onRefresh }: {
 
 // ─── OrderCard (acordeón) ─────────────────────────────────────────────────────
 
-function OrderCard({ listOrder, expanded, onToggle, onRefresh, readOnly }: {
+function OrderCard({ listOrder, expanded, onToggle, onRefresh, readOnly, filterMethod }: {
   listOrder: Order
   expanded: boolean
   onToggle: () => void
   onRefresh: () => void
   readOnly: boolean
+  filterMethod?: string | null
 }) {
   const c = useAppColors()
   const s = makeCardStyles(c)
@@ -696,15 +697,38 @@ function OrderCard({ listOrder, expanded, onToggle, onRefresh, readOnly }: {
           <Text style={s.rowItems}>{(order as any).itemsCount ?? order.items?.length ?? 0} producto(s)</Text>
         </View>
         <View style={{ alignItems: 'flex-end', gap: 6, marginRight: 8 }}>
-          <Text style={s.rowTotal}>{formatCurrency(parseFloat(order.total), sign)}</Text>
-          <View style={[s.badge, { backgroundColor: color + '22' }]}>
-            <Text style={[s.badgeText, { color }]}>{label}</Text>
-          </View>
-          {readOnly && order.paymentMethod && (
-            <Text style={{ fontSize: 11, color: c.textMuted }}>
-              {payMethods.find((m) => m.key === order.paymentMethod)?.label ?? order.paymentMethod}
-            </Text>
-          )}
+          {(() => {
+            const entries = order.paymentEntries ?? []
+            const isSplit = entries.length > 1
+            const total = parseFloat(order.total)
+            const filteredEntry = readOnly && filterMethod && isSplit
+              ? entries.find((e) => e.paymentMethod === filterMethod)
+              : null
+            return (
+              <>
+                <Text style={s.rowTotal}>
+                  {filteredEntry
+                    ? `${formatCurrency(filteredEntry.amount, sign)} (${formatCurrency(total, sign)})`
+                    : formatCurrency(total, sign)
+                  }
+                </Text>
+                <View style={[s.badge, { backgroundColor: color + '22' }]}>
+                  <Text style={[s.badgeText, { color }]}>{label}</Text>
+                </View>
+                {readOnly && (
+                  isSplit ? (
+                    <Text style={{ fontSize: 11, color: c.textMuted }}>
+                      {entries.map((e) => `${payMethods.find((m) => m.key === e.paymentMethod)?.label ?? e.paymentMethod} ${formatCurrency(e.amount, sign)}`).join(' · ')}
+                    </Text>
+                  ) : order.paymentMethod ? (
+                    <Text style={{ fontSize: 11, color: c.textMuted }}>
+                      {payMethods.find((m) => m.key === order.paymentMethod)?.label ?? order.paymentMethod}
+                    </Text>
+                  ) : null
+                )}
+              </>
+            )
+          })()}
         </View>
         <Ionicons name={expanded ? 'chevron-up' : 'chevron-down'} size={18} color={c.textMuted} style={{ alignSelf: 'center' }} />
       </TouchableOpacity>
@@ -723,12 +747,30 @@ function OrderCard({ listOrder, expanded, onToggle, onRefresh, readOnly }: {
                   {order.customerPhone  && <Text style={s.meta}>Tel: {order.customerPhone}</Text>}
                   {order.customerAddress && <Text style={s.meta}>Dirección: {order.customerAddress}</Text>}
                   {order.customerNotes  && <Text style={s.meta}>Nota cliente: {order.customerNotes}</Text>}
-                  {readOnly && order.paymentMethod && (
-                    <Text style={s.meta}>
-                      Pago: {payMethods.find((m) => m.key === order.paymentMethod)?.label ?? order.paymentMethod}
-                      {order.paymentNotes ? ` · ${order.paymentNotes}` : ''}
-                    </Text>
-                  )}
+                  {readOnly && (() => {
+                    const entries = order.paymentEntries ?? []
+                    if (entries.length > 1) {
+                      return (
+                        <>
+                          {entries.map((e, i) => (
+                            <Text key={i} style={s.meta}>
+                              Pago ({payMethods.find((m) => m.key === e.paymentMethod)?.label ?? e.paymentMethod}): {formatCurrency(e.amount, sign)}
+                            </Text>
+                          ))}
+                          {order.paymentNotes ? <Text style={s.meta}>Nota: {order.paymentNotes}</Text> : null}
+                        </>
+                      )
+                    }
+                    if (order.paymentMethod) {
+                      return (
+                        <Text style={s.meta}>
+                          Pago: {payMethods.find((m) => m.key === order.paymentMethod)?.label ?? order.paymentMethod}
+                          {order.paymentNotes ? ` · ${order.paymentNotes}` : ''}
+                        </Text>
+                      )
+                    }
+                    return null
+                  })()}
 
                   {/* Nota del pedido — editable */}
                   {canEditNotes ? (
@@ -1081,7 +1123,13 @@ export default function PedidosScreen() {
 
   const histBase = histTab === 'all' ? completedOrders : cancelledOrders
   const filteredHist = histBase.filter((o) => {
-    if (hFilterMethod && o.paymentMethod !== hFilterMethod) return false
+    if (hFilterMethod) {
+      const entries = o.paymentEntries ?? []
+      const match = entries.length > 0
+        ? entries.some((e) => e.paymentMethod === hFilterMethod)
+        : o.paymentMethod === hFilterMethod
+      if (!match) return false
+    }
     if (hFilterType && o.type !== hFilterType) return false
     return true
   })
@@ -1265,6 +1313,7 @@ export default function PedidosScreen() {
                 onToggle={() => toggleExpand(item.id)}
                 onRefresh={refresh}
                 readOnly={mode === 'historial'}
+                filterMethod={mode === 'historial' ? hFilterMethod : null}
               />
             )}
             contentContainerStyle={s.list}
