@@ -126,11 +126,11 @@ function PayModal({ order, onClose, onRefresh }: {
     } catch (err: any) {
       const isNetErr = !isConnected || (err as any)?.status === 0 || err?.message === 'Sin conexión'
       if (isNetErr) {
-        enqueueSync('update_order_status', {
+        enqueueSync('close_order', {
           orderId: order.id,
-          action: 'close',
           payments: validPayments,
           customerName: isCredit ? customerName.trim() : undefined,
+          paymentNotes: isCredit ? paymentNotes.trim() : undefined,
         })
         removeOrderFromCache(order.id)
         qc.setQueryData<Order[]>(['orders', 'active'], (old = []) => old.filter((o) => o.id !== order.id))

@@ -381,6 +381,14 @@ function HistoryRow({ reg, sign, labels }: { reg: CashRegister; sign: string; la
   )
 }
 
+// ─── Helper: detectar caja de día anterior ────────────────────────────────────
+
+function isFromPreviousDay(dateStr: string) {
+  const bogotaToday = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Bogota' })
+  const bogotaDate = new Date(dateStr).toLocaleDateString('en-CA', { timeZone: 'America/Bogota' })
+  return bogotaDate < bogotaToday
+}
+
 // ─── Pantalla principal ───────────────────────────────────────────────────────
 
 export default function CajaScreen() {
@@ -414,6 +422,36 @@ export default function CajaScreen() {
     refetch()
   }
 
+  async function handleQuickClose() {
+    if (!summary) return
+    Alert.alert(
+      'Cerrar sin arqueo',
+      '¿Confirmas el cierre de caja sin realizar conteo físico? Se registrará sin diferencia.',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Confirmar cierre',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const countedByMethodNums: Record<string, number> = { cash: 0 }
+              for (const [method, amount] of Object.entries(summary.byPaymentMethod)) {
+                countedByMethodNums[method] = amount
+              }
+              await api.post('/api/tenant/caja', {
+                action: 'close',
+                countedByMethod: countedByMethodNums,
+              })
+              invalidate()
+            } catch (err: any) {
+              Alert.alert('Error', err.message)
+            }
+          },
+        },
+      ]
+    )
+  }
+
   if (isLoading) {
     return <View style={styles.centered}><ActivityIndicator size="large" color={PRIMARY} /></View>
   }
@@ -435,6 +473,26 @@ export default function CajaScreen() {
         contentContainerStyle={styles.scroll}
         refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={PRIMARY} />}
       >
+        {/* ── Advertencia: caja del día anterior ── */}
+        {isOpen && reg?.openedAt && isFromPreviousDay(reg.openedAt) && (
+          <View style={styles.prevDayBanner}>
+            <Ionicons name="warning-outline" size={20} color="#92400e" style={{ marginRight: 10, marginTop: 2 }} />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.prevDayTitle}>Caja del día anterior sin cerrar</Text>
+              <Text style={styles.prevDayText}>
+                Esta caja fue abierta el{' '}
+                {new Date(reg.openedAt).toLocaleDateString('es-CO', {
+                  timeZone: 'America/Bogota',
+                  weekday: 'long',
+                  day: 'numeric',
+                  month: 'long',
+                })}
+                . Realiza el cierre antes de registrar ventas del nuevo día.
+              </Text>
+            </View>
+          </View>
+        )}
+
         {/* ── Estado de caja ── */}
         <View style={[styles.statusCard, isOpen ? styles.statusOpen : styles.statusClosed]}>
           <View style={{ flex: 1 }}>
@@ -478,6 +536,10 @@ export default function CajaScreen() {
             <TouchableOpacity style={styles.closeCajaBtn} onPress={() => setCloseModal(true)}>
               <Ionicons name="lock-closed-outline" size={18} color="#fff" />
               <Text style={styles.primaryBtnText}>Cerrar caja</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.quickCloseBtn} onPress={handleQuickClose}>
+              <Ionicons name="lock-closed-outline" size={18} color="#92400e" />
+              <Text style={styles.quickCloseBtnText}>Cerrar sin arqueo</Text>
             </TouchableOpacity>
           </>
         )}
@@ -533,6 +595,14 @@ function makeStyles(c: ReturnType<typeof useAppColors>) {
     centered: { flex: 1, alignItems: 'center', justifyContent: 'center' },
     scroll:  { padding: 16, gap: 14, paddingBottom: 40 },
 
+    prevDayBanner: {
+      flexDirection: 'row', alignItems: 'flex-start',
+      backgroundColor: '#fef3c7', borderColor: '#fcd34d', borderWidth: 1,
+      borderRadius: 12, padding: 14,
+    },
+    prevDayTitle: { fontSize: 14, fontWeight: '700', color: '#78350f', marginBottom: 3 },
+    prevDayText:  { fontSize: 13, color: '#92400e', lineHeight: 18 },
+
     statusCard: {
       flexDirection: 'row', alignItems: 'center', padding: 18,
       borderRadius: 14, gap: 12,
@@ -574,6 +644,12 @@ function makeStyles(c: ReturnType<typeof useAppColors>) {
       flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
       backgroundColor: '#ef4444', borderRadius: 14, padding: 16, gap: 8,
     },
+    quickCloseBtn: {
+      flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+      backgroundColor: '#fef3c7', borderColor: '#fcd34d', borderWidth: 1,
+      borderRadius: 14, padding: 14, gap: 8,
+    },
+    quickCloseBtnText: { color: '#92400e', fontWeight: '700', fontSize: 15 },
     primaryBtnText: { color: '#fff', fontWeight: '700', fontSize: 15 },
 
     histRow: {

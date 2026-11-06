@@ -58,16 +58,29 @@ export function getTablesFromCache(): Table[] | null {
   return rows.length ? parseRows<Table>(rows) : null
 }
 
-// ─── Kitchen orders (upsert — no borra los que no son sent/preparing) ─────────
+// ─── Kitchen orders ───────────────────────────────────────────────────────────
 
 export function saveKitchenOrdersToCache(orders: Order[]) {
   const db = getDb()
-  for (const o of orders) {
-    db.runSync(
-      'INSERT OR REPLACE INTO cache_orders (id, data, is_local) VALUES (?, ?, 0)',
-      [o.id, JSON.stringify(o)],
-    )
-  }
+  db.withTransactionSync(() => {
+    // Elimina entradas del servidor que ya no están en la respuesta de cocina
+    // (órdenes cerradas/canceladas desde otro dispositivo)
+    if (orders.length > 0) {
+      const placeholders = orders.map(() => '?').join(',')
+      db.runSync(
+        `DELETE FROM cache_orders WHERE is_local = 0 AND id NOT IN (${placeholders})`,
+        orders.map((o) => o.id),
+      )
+    } else {
+      db.runSync('DELETE FROM cache_orders WHERE is_local = 0')
+    }
+    for (const o of orders) {
+      db.runSync(
+        'INSERT OR REPLACE INTO cache_orders (id, data, is_local) VALUES (?, ?, 0)',
+        [o.id, JSON.stringify(o)],
+      )
+    }
+  })
 }
 
 // ─── Orders ───────────────────────────────────────────────────────────────────

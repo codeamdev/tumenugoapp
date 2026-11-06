@@ -5,6 +5,7 @@ import { removeOrderFromCache } from './cache'
 export type SyncOpType =
   | 'create_order'
   | 'update_order_status'
+  | 'close_order'
   | 'cancel_item'
   | 'toggle_product'
   | 'toggle_table_status'
@@ -134,6 +135,12 @@ async function processSyncItem(item: SyncItem): Promise<void> {
     case 'update_order_status': {
       const { orderId, ...body } = item.payload
       await api.patch(`/api/tenant/orders/${orderId}`, body)
+      break
+    }
+
+    case 'close_order': {
+      const { orderId, ...body } = item.payload
+      await api.patch(`/api/tenant/orders/${orderId}`, { action: 'close', ...body })
       break
     }
 

@@ -200,6 +200,20 @@ export const ORDER_TYPE_LABELS: Record<OrderType, string> = {
 }
 
 // Record<PaymentMethod,string> forces exhaustiveness: add a key here whenever the union grows.
+export interface InventoryItem {
+  id: string
+  name: string
+  unit: string
+  stock: string
+  minStock: string
+  costPerUnit: string | null
+  expiresAt: string | null
+  notes: string | null
+  isActive: boolean
+  createdAt: string | null
+  updatedAt: string | null
+}
+
 export const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {
   cash:       'Efectivo',
   card:       'Tarjeta',

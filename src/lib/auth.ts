@@ -62,12 +62,12 @@ export async function getSavedConfig(): Promise<Record<string, unknown> | null> 
 }
 
 // Borra TODO (logout online / forzado por servidor)
+// BIOMETRIC_ENABLED_KEY se conserva: la preferencia es del dispositivo, no de la sesión
 export async function clearSession(): Promise<void> {
   await Promise.all([clearToken(), clearRefreshToken()])
   await AsyncStorage.multiRemove([USER_KEY, TENANT_KEY, CONFIG_KEY])
   await secureDelete(OFFLINE_CRED_KEY)
   await secureDelete(SESSION_LOCKED_KEY)
-  await secureDelete(BIOMETRIC_ENABLED_KEY)
 }
 
 // ─── Credenciales offline ─────────────────────────────────────────────────────

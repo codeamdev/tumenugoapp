@@ -26,6 +26,7 @@ const MENU: MenuItem[] = [
   { icon: 'bar-chart-outline',   label: 'Informes',       desc: 'Ventas, pedidos y estadísticas',  route: '/mas/informes',       roles: ['admin', 'cajero'], color: '#10b981' },
 
   { icon: 'fast-food-outline',   label: 'Productos',      desc: 'Disponibilidad del catálogo',     route: '/mas/productos',      roles: ['admin', 'cajero'], color: '#f59e0b' },
+  { icon: 'cube-outline',        label: 'Inventario',     desc: 'Stock de insumos y alertas',      route: '/mas/inventario',     roles: ['admin', 'cajero'], color: '#0ea5e9' },
   { icon: 'people-outline',      label: 'Usuarios',       desc: 'Gestión de empleados',            route: '/mas/usuarios',       roles: ['admin'], color: '#ef4444' },
   { icon: 'settings-outline',    label: 'Configuración',  desc: 'Personalización del negocio',     route: '/mas/configuracion',  roles: ['admin'], color: '#8b5cf6' },
 ]
